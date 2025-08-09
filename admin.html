@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard - Laila's Treasures</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    body { padding: 2rem; font-family: Arial; }
+    .section { margin-bottom: 3rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    input, select { margin-bottom: 0.5rem; padding: 0.4rem; width: 100%; }
+    button { padding: 0.5rem 1rem; margin-top: 0.5rem; background: gold; border: none; font-weight: bold; cursor: pointer; }
+    img.product-preview { width: 60px; height: auto; border-radius: 4px; }
+    .message-box { margin-bottom: 1rem; border: 1px solid #ddd; padding: 1rem; background: #f9f9f9; }
+    .error { color: #b00020; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>Admin Panel - Laila's Treasures</h1>
+
+  <div class="section">
+    <h2>Manage Products</h2>
+    <p style="margin:0;color:#666;">Save will <b>upsert</b> by <i>name + material + category</i>.</p>
+
+    <form id="productForm">
+      <input type="hidden" id="editId">
+      <input type="text" id="productName" placeholder="Product Name" required>
+      <input type="text" id="productImage" placeholder="Image filename (e.g. gold1.jpg)" required>
+
+      <select id="productMaterial" required>
+        <option value="">Select Material</option>
+        <option value="8K Gold">8K Gold</option>
+        <option value="10K Gold">10K Gold</option>
+        <option value="14K Gold">14K Gold</option>
+        <option value="Gold Plated">Gold Plated</option>
+        <option value="Florida Gold">Florida Gold</option>
+        <option value="Silver">Silver</option>
+        <option value="Rose Gold">Rose Gold</option>
+        <option value="Plated Rose Gold">Plated Rose Gold</option>
+      </select>
+
+      <input type="number" id="productPrice" placeholder="Price Per Tooth" required step="0.01" min="0">
+
+      <select id="productCategory" required>
+        <option value="">Select Category</option>
+        <option value="gold-grillz.html">Gold</option>
+        <option value="silver-grillz.html">Silver</option>
+        <option value="rosegold-grillz.html">Rose Gold</option>
+      </select>
+
+      <div style="display:flex; gap: .6rem;">
+        <button type="submit">Save Product</button>
+        <button type="button" id="clearBtn">Clear</button>
+      </div>
+      <div id="formError" class="error"></div>
+    </form>
+
+    <div id="productList" style="margin-top:1rem;"></div>
+  </div>
+
+  <div class="section">
+    <h2>Customer Messages</h2>
+    <div id="messageList"><em>Messages migration coming later</em></div>
+  </div>
+
+<script>
+  // ---- CONFIG: Backend base URL ----
+  const API_BASE = 'https://lailastreasures.onrender.com'; // Render backend
+  const PRODUCTS_API = `${API_BASE}/api/products`;
+
+  // ---- Auth gate (same as before) ----
+  if (!localStorage.getItem("userLoggedIn")) {
+    window.location.href = "login.html";
+  }
+
+  // Utilities
+  const $ = sel => document.querySelector(sel);
+  const slugify = s => s.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+
+  // Load list
+  async function loadProducts() {
+    const list = $('#productList');
+    list.innerHTML = 'Loading...';
+    try {
+      const res = await fetch(PRODUCTS_API, { credentials: 'omit' });
+      if (!res.ok) throw new Error(`List failed: ${res.status}`);
+      const items = await res.json();
+
+      if (!items.length) {
+        list.innerHTML = "<p>No products added yet.</p>";
+        return;
+      }
+
+      let html = `<table><thead>
+        <tr><th>Name</th><th>Image</th><th>Material</th><th>Price</th><th>Category</th><th>Actions</th></tr>
+      </thead><tbody>`;
+
+      items.forEach(p => {
+        html += `<tr>
+          <td>${p.name}</td>
+          <td><img src="assets/images/${p.img}" class="product-preview" alt="${p.name}"></td>
+          <td>${p.material || ''}</td>
+          <td>$${Number(p.price || 0).toFixed(2)}</td>
+          <td>${(p.category || '').replace('.html','')}</td>
+          <td>
+            <button onclick='fillForm(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Edit</button>
+            <button onclick="deleteProduct('${p._id}')" style="background:red;color:#fff;">Delete</button>
+          </td>
+        </tr>`;
+      });
+
+      html += "</tbody></table>";
+      list.innerHTML = html;
+    } catch (err) {
+      console.error(err);
+      list.innerHTML = `<p class="error">Error loading products: ${err.message}</p>`;
+      alert('Failed to fetch (list). Check CORS and backend.');
+    }
+  }
+
+  // Fill form for edit
+  function fillForm(p) {
+    $('#editId').value = p._id || '';
+    $('#productName').value = p.name || '';
+    $('#productImage').value = p.img || '';
+    $('#productMaterial').value = p.material || '';
+    $('#productPrice').value = p.price || '';
+    $('#productCategory').value = p.category || '';
+    $('#formError').textContent = '';
+  }
+
+  // Clear form
+  $('#clearBtn').addEventListener('click', () => {
+    $('#productForm').reset();
+    $('#editId').value = '';
+    $('#formError').textContent = '';
+  });
+
+  // Save (upsert)
+  document.getElementById('productForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('#formError').textContent = '';
+
+    const name = $('#productName').value.trim();
+    const img = $('#productImage').value.trim();
+    const material = $('#productMaterial').value.trim();
+    const price = parseFloat($('#productPrice').value);
+    const category = $('#productCategory').value;
+    const designKey = slugify(name); // backend expects this field
+
+    const payload = { name, designKey, category, material, price, img };
+
+    try {
+      const res = await fetch(PRODUCTS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`Save failed: ${res.status} ${t}`);
+      }
+      alert('Saved!');
+      $('#productForm').reset();
+      $('#editId').value = '';
+      loadProducts();
+    } catch (err) {
+      console.error(err);
+      $('#formError').textContent = err.message;
+      alert('Failed to fetch (save). Check backend URL/CORS.');
+    }
+  });
+
+  // Delete
+  async function deleteProduct(id) {
+    if (!id) return alert('Missing id for delete.');
+    if (!confirm('Delete this product?')) return;
+    try {
+      const res = await fetch(`${PRODUCTS_API}/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+      loadProducts();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to fetch (delete).');
+    }
+  }
+  window.deleteProduct = deleteProduct; // expose for onclick
+
+  // Init
+  loadProducts();
+</script>
+</body>
+</html>

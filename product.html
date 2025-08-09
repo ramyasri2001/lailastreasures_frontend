@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Product - Laila's Treasures</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .product-container { display: flex; gap: 3rem; margin-top: 2rem; align-items: flex-start; }
+    .product-image { flex: 1; max-width: 400px; }
+    .product-details { flex: 2; }
+    .price { font-size: 1.3rem; margin-top: 1rem; font-weight: bold; }
+    .discount { color: green; font-weight: bold; }
+    .tooth { width: 28px; height: 40px; background-color: white; border: 1px solid #aaa; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+    .tooth.selected { background-color: gold; border-color: #d4af37; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Laila's Treasures</div>
+  <nav>
+    <ul>
+      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="cart.html">Saved Designs</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+    </ul>
+  </nav>
+</header>
+
+<script>
+  function handleLogout() {
+    localStorage.removeItem("userLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    alert("You have been logged out.");
+    window.location.href = "login.html";
+  }
+  const userName = localStorage.getItem("userName");
+  const isLoggedIn = localStorage.getItem("userLoggedIn");
+  if (userName && isLoggedIn === "true") {
+    document.getElementById("userNameDisplay").textContent = `(${userName})`;
+  }
+</script>
+
+<main style="padding: 2rem;">
+  <div class="product-container">
+    <div class="product-image">
+      <img id="productImage" src="" alt="Grill" style="width: 100%; border-radius: 8px;">
+    </div>
+    <div class="product-details">
+      <h2 id="productName">Loading...</h2>
+      <div><strong>Material:</strong> <span id="materialLabel">Loading...</span></div><br>
+
+      <div id="goldMaterialSelectContainer" style="display: none;">
+        <label id="goldMaterialLabel">Select Gold Type:</label><br>
+        <select id="goldMaterialSelect"></select><br><br>
+      </div>
+
+      <label for="topTeeth">Top Teeth:</label>
+      <input type="number" id="topTeeth" min="0" value="0" readonly><br><br>
+
+      <label for="bottomTeeth">Bottom Teeth:</label>
+      <input type="number" id="bottomTeeth" min="0" value="0" readonly><br><br>
+
+      <div class="price">Total Price: $<span id="priceValue">0.00</span></div>
+      <div id="discountNote" class="discount"></div><br>
+
+      <button onclick="addToCart()">Save Design</button>
+    </div>
+  </div>
+
+  <div style="margin-top: 2rem;">
+    <h3>Select Your Teeth:</h3>
+    <div id="teethDiagram" style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+      <div id="topRow" style="display: flex; gap: 0.3rem;"></div>
+      <div id="bottomRow" style="display: flex; gap: 0.3rem;"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const BASE_API = "https://lailastreasures.onrender.com";
+  const urlParams = new URLSearchParams(window.location.search);
+  const productName = urlParams.get("name") || "Grill";
+  const urlMaterial = urlParams.get("material"); // passed from category pages
+
+  let material = urlMaterial || "10K Gold";
+  let selectedTopTeeth = [1];   // preselect 1 tooth so price shows
+  let selectedBottomTeeth = [];
+
+  // local fallback cache
+  const adminProducts = JSON.parse(localStorage.getItem("adminProducts")) || [];
+
+  // DOM
+  const imgEl = document.getElementById("productImage");
+  const nameEl = document.getElementById("productName");
+  const materialLabelEl = document.getElementById("materialLabel");
+  const priceEl = document.getElementById("priceValue");
+  const discountNoteEl = document.getElementById("discountNote");
+  const topCountEl = document.getElementById("topTeeth");
+  const bottomCountEl = document.getElementById("bottomTeeth");
+  const goldWrap = document.getElementById("goldMaterialSelectContainer");
+  const goldLabel = document.getElementById("goldMaterialLabel");
+  const goldSelect = document.getElementById("goldMaterialSelect");
+
+  nameEl.textContent = productName;
+
+  // Build tooth grid
+  function buildTeeth(rowId, prefix) {
+    const row = document.getElementById(rowId);
+    for (let i = 1; i <= 10; i++) {
+      const tooth = document.createElement("div");
+      tooth.className = "tooth";
+      tooth.dataset.row = prefix;
+      tooth.dataset.index = i;
+      tooth.addEventListener("click", () => toggleTooth(tooth));
+      row.appendChild(tooth);
+    }
+  }
+  buildTeeth("topRow", "top");
+  buildTeeth("bottomRow", "bottom");
+  document.querySelector(".tooth[data-row='top'][data-index='1']").classList.add("selected");
+
+  function toggleTooth(el) {
+    const row = el.dataset.row;
+    const index = parseInt(el.dataset.index);
+    const list = row === "top" ? selectedTopTeeth : selectedBottomTeeth;
+    const idx = list.indexOf(index);
+    if (idx > -1) { list.splice(idx, 1); el.classList.remove("selected"); }
+    else { list.push(index); el.classList.add("selected"); }
+    updatePrice();
+  }
+
+  // ----- Data helpers -----
+  async function fetchProductBy(name, mat) {
+    try {
+      const qs = new URLSearchParams({ name, material: mat });
+      const res = await fetch(`${BASE_API}/api/products?${qs.toString()}`, { credentials: "omit" });
+      if (!res.ok) throw new Error("bad status");
+      const items = await res.json();
+      return items && items[0] ? items[0] : null;
+    } catch {
+      // fallback to local cache
+      const match = adminProducts.find(p => p.name === name && p.material === mat);
+      return match || null;
+    }
+  }
+
+  async function loadInitialProduct() {
+    // Configure the dropdown depending on category/material
+    const matLower = material.toLowerCase();
+
+    if (matLower.includes("silver")) {
+      goldWrap.style.display = "none";
+    } else if (matLower.includes("rose")) {
+      goldWrap.style.display = "block";
+      goldLabel.textContent = "Select Rose Gold Type:";
+      goldSelect.innerHTML = `
+        <option value="Rose Gold">Rose Gold</option>
+        <option value="Plated Rose Gold">Plated Rose Gold</option>
+      `;
+      goldSelect.value = material;
+      goldSelect.onchange = handleMaterialChange;
+    } else {
+      goldWrap.style.display = "block";
+      goldLabel.textContent = "Select Gold Type:";
+      goldSelect.innerHTML = `
+        <option value="8K Gold">8K Gold</option>
+        <option value="10K Gold">10K Gold</option>
+        <option value="14K Gold">14K Gold</option>
+        <option value="Gold Plated">Gold Plated</option>
+        <option value="Florida Gold">Florida Gold</option>
+      `;
+      goldSelect.value = material;
+      goldSelect.onchange = handleMaterialChange;
+    }
+
+    await updatePrice(); // will also load image/price
+  }
+
+  function handleMaterialChange(e) {
+    material = e.target.value;
+    materialLabelEl.textContent = material;
+    updatePrice();
+  }
+
+  async function updatePrice() {
+    materialLabelEl.textContent = material;
+
+    // Load product record for the chosen material
+    const rec = await fetchProductBy(productName, material);
+
+    // Update image
+    if (rec && rec.img) {
+      imgEl.src = `assets/images/${rec.img}`;
+    } else {
+      imgEl.src = "assets/images/gold1.jpg";
+    }
+
+    // Compute totals
+    const top = selectedTopTeeth.length;
+    const bottom = selectedBottomTeeth.length;
+    const total = top + bottom;
+
+    const pricePerTooth = rec && rec.price ? Number(rec.price) : 0;
+    let totalPrice = total * pricePerTooth;
+    let discount = "";
+    if (total >= 6) { totalPrice *= 0.8; discount = "Since you selected 6 or more teeth, you get 20% discount!"; }
+
+    priceEl.textContent = totalPrice.toFixed(2);
+    discountNoteEl.textContent = discount;
+    topCountEl.value = top;
+    bottomCountEl.value = bottom;
+  }
+
+  async function addToCart() {
+    const isLoggedIn = localStorage.getItem("userLoggedIn");
+    if (isLoggedIn !== "true") {
+      alert("Please log in to save your design.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    const top = selectedTopTeeth.length;
+    const bottom = selectedBottomTeeth.length;
+    if (top + bottom === 0) {
+      alert("Please select at least one tooth before saving.");
+      return;
+    }
+
+    const rec = await fetchProductBy(productName, material);
+    if (!rec) {
+      alert("Unable to save design: product or price not found.");
+      return;
+    }
+
+    const price = parseFloat(priceEl.textContent);
+    if (!Number.isFinite(price)) {
+      alert("Please choose material and teeth so we can calculate the price.");
+      return;
+    }
+
+    const item = {
+      name: productName,
+      img: rec.img ? `assets/images/${rec.img}` : imgEl.src,
+      material,
+      top,
+      bottom,
+      selectedTop: selectedTopTeeth,
+      selectedBottom: selectedBottomTeeth,
+      price
+    };
+
+    const cart = JSON.parse(localStorage.getItem("savedGrillz")) || [];
+    cart.push(item);
+    localStorage.setItem("savedGrillz", JSON.stringify(cart));
+    alert("Design saved!");
+    window.location.href = "cart.html";
+  }
+
+  window.onload = loadInitialProduct;
+</script>
+</body>
+</html>

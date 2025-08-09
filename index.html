@@ -1,0 +1,43 @@
+<html>
+<head>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">Laila's Treasures</div>
+  <nav>
+    <ul>
+      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="cart.html">Saved Designs</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+    </ul>
+  </nav>
+</header>
+<script>
+
+  const userName = localStorage.getItem("userName");
+  const isLoggedIn = localStorage.getItem("userLoggedIn");
+
+  if (userName && isLoggedIn === "true") {
+    document.getElementById("userNameDisplay").textContent = `(${userName})`;
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("userLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    alert("You have been logged out.");
+    window.location.href = "login.html";
+  }
+
+</script>
+
+<main>
+  <section class="hero">
+    <h1>Custom Gold Grillz for Every Style</h1>
+    <p>Shop our handcrafted collection of premium grillz.</p>
+  </section>
+</main>
+</body>
+</html>

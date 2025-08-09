@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Saved Designs – Laila's Treasures</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .design-buttons { display: flex; gap: 0.6rem; }
+    .design-buttons button { padding: 0.4rem 0.8rem; font-weight: bold; border-radius: 4px; cursor: pointer; }
+    .saved-item { padding: 0.6rem 0; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Laila's Treasures</div>
+  <nav>
+    <ul>
+      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="cart.html">Saved Designs</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <h1>Your Saved Grillz</h1>
+  <div id="saved-designs"></div>
+  <h2>Total: $<span id="totalPrice">0.00</span></h2>
+  <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+    <button onclick="location.href='grillz.html'">Continue Shopping</button>
+    <button onclick="location.href='contact.html'">Send Message</button>
+  </div>
+</main>
+
+<script>
+  function handleLogout() {
+    localStorage.removeItem("userLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    alert("You have been logged out.");
+    window.location.href = "login.html";
+  }
+
+  // Header user label
+  (function initHeaderUser() {
+    const userName = localStorage.getItem("userName");
+    const isLoggedIn = localStorage.getItem("userLoggedIn");
+    if (userName && isLoggedIn === "true") {
+      document.getElementById("userNameDisplay").textContent = `(${userName})`;
+    }
+  })();
+
+  // Normalize image path (handles "xyz.jpg" vs "assets/images/xyz.jpg")
+  function normalizeImg(src) {
+    if (!src) return "";
+    if (src.startsWith("http") || src.startsWith("assets/")) return src;
+    return "assets/images/" + src;
+  }
+
+  function renderSavedDesigns() {
+    const saved = JSON.parse(localStorage.getItem("savedGrillz")) || [];
+    const container = document.getElementById("saved-designs");
+    container.innerHTML = "";
+
+    if (saved.length === 0) {
+      container.innerHTML = "<p>No designs saved yet.</p>";
+      document.getElementById("totalPrice").textContent = "0.00";
+      return;
+    }
+
+    let total = 0;
+
+    saved.forEach((item, index) => {
+      const price = Number(item.price) || 0;
+      total += price;
+
+      const topList = Array.isArray(item.selectedTop) ? item.selectedTop.join(", ") : "";
+      const bottomList = Array.isArray(item.selectedBottom) ? item.selectedBottom.join(", ") : "";
+      const materialLabel = item.material || "Not specified";
+
+      const div = document.createElement("div");
+      div.className = "saved-item";
+      div.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <img src="${normalizeImg(item.img)}" alt="${item.name}" style="width: 60px; height: 40px; object-fit: cover; border-radius: 4px;">
+          <span style="flex: 1;">
+            <strong>${item.name}</strong><br>
+            Material: ${materialLabel}<br>
+            Top Teeth: ${item.top || 0} [${topList || "-"}]<br>
+            Bottom Teeth: ${item.bottom || 0} [${bottomList || "-"}]<br>
+            Price: $${price.toFixed(2)}
+          </span>
+          <div class="design-buttons">
+            <button class="remove-btn" onclick="removeDesign(${index})">Remove</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+
+    document.getElementById("totalPrice").textContent = total.toFixed(2);
+  }
+
+  function removeDesign(index) {
+    const saved = JSON.parse(localStorage.getItem("savedGrillz")) || [];
+    saved.splice(index, 1);
+    localStorage.setItem("savedGrillz", JSON.stringify(saved));
+    renderSavedDesigns();
+  }
+
+  document.addEventListener("DOMContentLoaded", renderSavedDesigns);
+</script>
+</body>
+</html>

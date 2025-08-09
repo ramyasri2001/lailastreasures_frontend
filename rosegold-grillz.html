@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">Laila's Treasures</div>
+  <nav>
+    <ul>
+      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="cart.html">Saved Designs</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+    </ul>
+  </nav>
+</header>
+<main>
+  <h1 style="text-align:center;">Rosegold Grillz Collection</h1>
+  <div id="productGallery" class="product-gallery" style="display:flex;flex-wrap:wrap;justify-content:center;gap:2rem;margin-top:2rem;"></div>
+</main>
+
+<script>
+const API = "https://lailastreasures.onrender.com";
+const CATEGORY = "rosegold-grillz.html";
+
+function handleLogout(){
+  localStorage.removeItem("userLoggedIn");
+  localStorage.removeItem("userName");
+  localStorage.removeItem("userEmail");
+  alert("You have been logged out.");
+  location.href="login.html";
+}
+const userName = localStorage.getItem("userName");
+if (userName && localStorage.getItem("userLoggedIn")==="true"){
+  document.getElementById("userNameDisplay").textContent = `(${userName})`;
+}
+
+async function load(){
+  const gallery = document.getElementById("productGallery");
+
+  async function fromBackend(){
+    const r = await fetch(`${API}/api/products?category=${encodeURIComponent(CATEGORY)}`);
+    if(!r.ok) throw new Error("backend");
+    return r.json();
+  }
+  function fromLocal(){
+    const all = JSON.parse(localStorage.getItem("adminProducts"))||[];
+    return all.filter(p=>p.category===CATEGORY);
+  }
+
+  let items=[];
+  try { items = await fromBackend(); }
+  catch { items = fromLocal(); }
+
+  if(!items.length){ gallery.innerHTML="<p>No products found.</p>"; return; }
+
+  const byName = new Map();
+  for(const p of items){ if(!byName.has(p.name)) byName.set(p.name, p); }
+  const list = [...byName.values()];
+
+  list.forEach(p=>{
+    const img = p.img?.startsWith("http") ? p.img : `assets/images/${p.img}`;
+    const card = document.createElement("div");
+    card.className="product";
+    card.innerHTML = `
+      <img src="${img}" alt="${p.name}">
+      <h2>${p.name}</h2>
+      <a href="product.html?name=${encodeURIComponent(p.name)}&material=${encodeURIComponent('Rose Gold')}">
+        <button>View</button>
+      </a>`;
+    gallery.appendChild(card);
+  });
+}
+load();
+</script>
+
+</body>
+</html>

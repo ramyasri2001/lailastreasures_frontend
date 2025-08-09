@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Contact – Laila's Treasures</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    textarea { min-height: 150px; }
+    .hint { font-size: .9rem; color: #666; margin: .5rem 0 1rem; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Laila's Treasures</div>
+  <nav>
+    <ul>
+      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="cart.html">Saved Designs</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+    </ul>
+  </nav>
+</header>
+
+<script>
+  const API_BASE = 'https://lailastreasures.onrender.com';
+
+  function handleLogout() {
+    localStorage.removeItem("userLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    alert("You have been logged out.");
+    window.location.href = "login.html";
+  }
+
+  // Header user label
+  (function initHeaderUser() {
+    const userName = localStorage.getItem("userName");
+    const isLoggedIn = localStorage.getItem("userLoggedIn");
+    if (userName && isLoggedIn === "true") {
+      document.getElementById("userNameDisplay").textContent = `(${userName})`;
+    }
+  })();
+
+  function generateSummary() {
+    const saved = JSON.parse(localStorage.getItem("savedGrillz")) || [];
+    if (!saved.length) return "No designs saved.";
+
+    let message = "Hello,\n\nI am interested in the following grillz designs:\n\n";
+
+    saved.forEach((item, index) => {
+      const price = Number(item.price) || 0;
+      const topTeeth = item.top || 0;
+      const bottomTeeth = item.bottom || 0;
+      const topList = Array.isArray(item.selectedTop) ? item.selectedTop.join(", ") : "-";
+      const bottomList = Array.isArray(item.selectedBottom) ? item.selectedBottom.join(", ") : "-";
+
+      message += `Design ${index + 1}:\n`;
+      message += `Name: ${item.name}\n`;
+      message += `Material: ${item.material || "Not specified"}\n`;
+      message += `Top Teeth (${topTeeth}): ${topList}\n`;
+      message += `Bottom Teeth (${bottomTeeth}): ${bottomList}\n`;
+      message += `Price: $${price.toFixed(2)}\n\n`;
+    });
+
+    message += "Please get back to me with the next steps. Thank you!";
+    return message;
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    const userName = localStorage.getItem("userName");
+    const userEmail = localStorage.getItem("userEmail");
+    if (userName) document.getElementById("contactName").value = userName;
+    if (userEmail) document.getElementById("contactEmail").value = userEmail;
+    document.getElementById("message").value = generateSummary();
+  });
+</script>
+
+<main>
+  <h1>Contact Us</h1>
+  <p>Enter your details and message below. We'll get back to you with the next steps!</p>
+  <p class="hint">Your current “Saved Designs” will be included when you send.</p>
+  
+  <form id="contactForm">
+    <input type="text" id="contactName" placeholder="Your Name" required>
+    <input type="email" id="contactEmail" placeholder="Your Email" required>
+    <label for="message">Message:</label>
+    <textarea id="message" required></textarea>
+    <button id="sendBtn" type="submit">Send</button>
+  </form>
+</main>
+
+<script>
+  document.getElementById("contactForm").onsubmit = async function(e) {
+    const isLoggedIn = localStorage.getItem("userLoggedIn");
+    if (isLoggedIn !== "true") {
+      e.preventDefault();
+      alert("Please log in first.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    e.preventDefault();
+
+    const name = document.getElementById("contactName").value.trim();
+    const email = document.getElementById("contactEmail").value.trim();
+    const message = document.getElementById("message").value.trim();
+    const designs = JSON.parse(localStorage.getItem("savedGrillz")) || [];
+
+    if (!name || !email || !message) {
+      alert("Please fill out all fields.");
+      return;
+    }
+
+    const btn = document.getElementById('sendBtn');
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message, designs })
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Server responded ${res.status}. ${text || ''}`);
+      }
+
+      // Success
+      alert("Message sent! We'll get back to you soon.");
+      document.getElementById("contactForm").reset();
+      document.getElementById("message").value = generateSummary(); // refill summary
+
+      // Optional: clear designs after sending
+      // localStorage.removeItem('savedGrillz');
+
+    } catch (err) {
+      console.error('Send message failed:', err);
+      alert("Couldn't send message. Please try again in a moment.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  };
+</script>
+
+</body>
+</html>

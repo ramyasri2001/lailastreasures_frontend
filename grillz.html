@@ -1,0 +1,57 @@
+
+<html>
+<head>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">Laila's Treasures</div>
+  <nav>
+    <ul>
+      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="cart.html">Saved Designs</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+    </ul>
+  </nav>
+</header>
+<script>
+
+   function handleLogout() {
+    localStorage.removeItem("userLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    alert("You have been logged out.");
+    window.location.href = "login.html";
+  }
+  const userName = localStorage.getItem("userName");
+  const isLoggedIn = localStorage.getItem("userLoggedIn");
+
+  if (userName && isLoggedIn === "true") {
+    document.getElementById("userNameDisplay").textContent = `(${userName})`;
+  }
+</script>
+
+<main>
+  <h1 style="text-align: center;">Choose Your Grillz Metal</h1>
+  <p style="text-align: center; font-size: 1.1rem;">Select from gold, silver, or rose gold to explore our collections.</p>
+  <div class="product-gallery" style="justify-content: center;">
+    <div class="product">
+      <img src="assets/images/grillz1.jpg" alt="Gold Grillz">
+      <h2>Gold Grillz</h2>
+      <a href="gold-grillz.html"><button>Explore</button></a>
+    </div>
+    <div class="product">
+      <img src="assets/images/grillz2.jpg" alt="Silver Grillz">
+      <h2>Silver Grillz</h2>
+      <a href="silver-grillz.html"><button>Explore</button></a>
+    </div>
+    <div class="product">
+      <img src="assets/images/grillz3.jpg" alt="Rose Gold Grillz">
+      <h2>Rose Gold Grillz</h2>
+      <a href="rosegold-grillz.html"><button>Explore</button></a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

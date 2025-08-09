@@ -1,0 +1,128 @@
+style.css
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #fff8f0;
+  color: #333;
+}
+header {
+  background-color: #1a1a1a;
+  color: white;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: gold;
+}
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 1.2rem;
+  margin: 0;
+  padding: 0;
+}
+nav a {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+nav a:hover {
+  color: gold;
+}
+main {
+  padding: 2rem;
+  background-color: #fff;
+  border-radius: 8px;
+  margin: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.hero {
+  background: linear-gradient(to right, #d4af37, #ffce00);
+  color: white;
+  text-align: center;
+  padding: 3rem 1rem;
+  border-radius: 8px;
+}
+h1 {
+  margin-bottom: 1rem;
+  font-size: 2rem;
+}
+.product-gallery {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+.product {
+  background: #fff;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  width: 250px;
+  text-align: center;
+}
+.product img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+button {
+  background: gold;
+  border: none;
+  padding: 0.5rem 1rem;
+  color: #000;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+button:hover {
+  background: #e6c200;
+}
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+input, textarea {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+#saved-designs div {
+  background: #fafafa;
+  padding: 0.5rem;
+  margin: 0.3rem 0;
+  border-left: 4px solid gold;
+  border-radius: 4px;
+}
+.saved-item {
+  background: #fafafa;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem 0;
+  border-left: 4px solid gold;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.remove-btn {
+  background: crimson;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.remove-btn:hover {
+  background: darkred;
+}
+

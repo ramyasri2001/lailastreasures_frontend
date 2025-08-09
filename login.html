@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login - Laila's Treasures</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    main {
+      max-width: 400px;
+      margin: auto;
+      padding-top: 3rem;
+    }
+    input {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Laila's Treasures</div>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="grillz.html">Grillz</a></li>
+        <li><a href="login.html">Login</a></li>
+        <li><a href="register.html">Create Account</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main>
+    <h1>Login</h1>
+    <form id="loginForm">
+      <input type="email" id="email" placeholder="Email" required>
+      <input type="password" id="password" placeholder="Enter your password" required><span id="toggleLoginPassword" style = "cursor: pointer;">👁️</span>
+      <button type="submit">Login</button>
+    </form>
+    <p>
+  <a href="forgot-password.html">Forgot your password?</a>
+</p>
+    <p>Don't have an account? <a href="register.html">Create one</a>.</p>
+  </main>
+
+  <script>
+    document.getElementById("loginForm").onsubmit = async function (e) {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+     
+      try {
+        const res = await fetch("https://lailastreasures.onrender.com/api/users/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          alert("Login successful!");
+          localStorage.setItem("userLoggedIn", "true");
+          localStorage.setItem("userName", data.name);
+          window.location.href = "grillz.html";
+        } else {
+          alert("Invalid email or password.");
+        }
+      } catch (err) {
+        alert("Server error. Please try again.");
+      }
+    };
+    document.getElementById("toggleLoginPassword").addEventListener("click", function () {
+      const passwordInput = document.getElementById("password");
+      const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+      passwordInput.setAttribute("type", type);
+      this.textContent = type === "password" ? "👁️" : "🙈";
+      });
+  </script>
+
+</body>
+</html>
