@@ -219,8 +219,7 @@
     }
   }
   window.deleteProduct = deleteProduct; // expose for onclick
-<script>
-  // ===== Drag & drop ordering (localStorage) =====
+
   const orderCategoryEl = document.getElementById('orderCategory');
   const orderListEl = document.getElementById('orderList');
   document.getElementById('reloadOrder').addEventListener('click', buildOrderList);
@@ -311,7 +310,6 @@
 
   // Build list on first load
   buildOrderList();
-</script>
 
   // Init
   loadProducts();

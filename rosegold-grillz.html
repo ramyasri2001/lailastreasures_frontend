@@ -72,7 +72,6 @@ async function load(){
     gallery.appendChild(card);
   });
 }
-<script>
   function loadSavedOrder(category) {
     return JSON.parse(localStorage.getItem(`order:${category}`)) || [];
   }
@@ -88,7 +87,6 @@ async function load(){
   });
 
   // ...then render cards as you do now
-</script>
 
 load();
 </script>
