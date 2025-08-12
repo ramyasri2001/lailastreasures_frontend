@@ -72,6 +72,24 @@ async function load(){
     gallery.appendChild(card);
   });
 }
+<script>
+  function loadSavedOrder(category) {
+    return JSON.parse(localStorage.getItem(`order:${category}`)) || [];
+  }
+
+  // After you compute `list` (unique designs) and have `currentPage` set:
+  const savedOrder = loadSavedOrder(currentPage);
+  list.sort((a, b) => {
+    const ia = savedOrder.indexOf(a.name);
+    const ib = savedOrder.indexOf(b.name);
+    const A = ia === -1 ? 999999 : ia;
+    const B = ib === -1 ? 999999 : ib;
+    return A - B || a.name.localeCompare(b.name);
+  });
+
+  // ...then render cards as you do now
+</script>
+
 load();
 </script>
 

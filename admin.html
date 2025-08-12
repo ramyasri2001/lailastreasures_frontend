@@ -13,6 +13,18 @@
     img.product-preview { width: 60px; height: auto; border-radius: 4px; }
     .message-box { margin-bottom: 1rem; border: 1px solid #ddd; padding: 1rem; background: #f9f9f9; }
     .error { color: #b00020; margin-top: .5rem; }
+  .order-item {
+    display:flex; align-items:center; gap:.75rem;
+    padding:.6rem .8rem; border-bottom:1px solid #eee; cursor:grab;
+    background:#fff;
+  }
+  .order-item:last-child { border-bottom:none; }
+  .order-handle {
+    width:12px; height:18px; background:repeating-linear-gradient(
+      to bottom, #bbb, #bbb 3px, #eee 3px, #eee 6px
+    ); border-radius:3px; flex:0 0 12px;
+  }
+  .order-item.dragging { opacity:.6; }
   </style>
 </head>
 <body>
@@ -57,6 +69,28 @@
 
     <div id="productList" style="margin-top:1rem;"></div>
   </div>
+<!-- ✅ Arrange Designs (drag & drop) -->
+<div class="section">
+  <h2>Arrange Designs (drag & drop)</h2>
+
+  <label>Pick a section:</label>
+  <select id="orderCategory">
+    <option value="gold-grillz.html">Gold</option>
+    <option value="silver-grillz.html">Silver</option>
+    <option value="rosegold-grillz.html">Rose Gold</option>
+  </select>
+
+  <div style="margin: 1rem 0;">
+    <button id="reloadOrder">Load Designs</button>
+    <button id="saveOrder" style="background:#10b981;color:#fff;">Save Order</button>
+  </div>
+
+  <ul id="orderList" style="list-style:none;padding:0;margin:0;border:1px solid #eee;border-radius:8px;">
+    <!-- Draggable items injected here -->
+  </ul>
+
+  <p style="margin-top:.5rem;color:#666;">Tip: drag items to reorder; click “Save Order”.</p>
+</div>
 
   <div class="section">
     <h2>Customer Messages</h2>
@@ -185,6 +219,99 @@
     }
   }
   window.deleteProduct = deleteProduct; // expose for onclick
+<script>
+  // ===== Drag & drop ordering (localStorage) =====
+  const orderCategoryEl = document.getElementById('orderCategory');
+  const orderListEl = document.getElementById('orderList');
+  document.getElementById('reloadOrder').addEventListener('click', buildOrderList);
+  document.getElementById('saveOrder').addEventListener('click', saveOrder);
+
+  function getProductsLS() {
+    return JSON.parse(localStorage.getItem('adminProducts')) || [];
+  }
+
+  function uniqueDesignsByCategory(category) {
+    const prods = getProductsLS().filter(p => p.category === category);
+    const map = {};
+    prods.forEach(p => {
+      if (!map[p.name]) map[p.name] = p; // one per design (any material)
+    });
+    return Object.values(map);
+  }
+
+  function loadSavedOrder(category) {
+    return JSON.parse(localStorage.getItem(`order:${category}`)) || [];
+  }
+
+  function buildOrderList() {
+    const category = orderCategoryEl.value;
+    const designs = uniqueDesignsByCategory(category);
+
+    // current saved order (array of names)
+    const saved = loadSavedOrder(category);
+
+    // sort designs according to saved order; unknowns go to the end
+    designs.sort((a, b) => {
+      const ia = saved.indexOf(a.name);
+      const ib = saved.indexOf(b.name);
+      const A = ia === -1 ? 999999 : ia;
+      const B = ib === -1 ? 999999 : ib;
+      return A - B || a.name.localeCompare(b.name);
+    });
+
+    orderListEl.innerHTML = '';
+    designs.forEach(d => {
+      const li = document.createElement('li');
+      li.className = 'order-item';
+      li.draggable = true;
+      li.dataset.name = d.name;
+      li.innerHTML = `
+        <div class="order-handle" title="Drag"></div>
+        <img src="assets/images/${d.img}" alt="" style="width:48px;height:32px;object-fit:cover;border-radius:4px;">
+        <div style="font-weight:600">${d.name}</div>
+      `;
+      addDragEvents(li);
+      orderListEl.appendChild(li);
+    });
+  }
+
+  function saveOrder() {
+    const category = orderCategoryEl.value;
+    const names = [...orderListEl.querySelectorAll('.order-item')].map(li => li.dataset.name);
+    localStorage.setItem(`order:${category}`, JSON.stringify(names));
+    alert('Order saved!');
+  }
+
+  function addDragEvents(el) {
+    el.addEventListener('dragstart', e => {
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
+  }
+
+  orderListEl.addEventListener('dragover', e => {
+    e.preventDefault();
+    const dragging = orderListEl.querySelector('.dragging');
+    const after = getDragAfterElement(orderListEl, e.clientY);
+    if (!dragging) return;
+    if (after == null) orderListEl.appendChild(dragging);
+    else orderListEl.insertBefore(dragging, after);
+  });
+
+  function getDragAfterElement(container, y) {
+    const els = [...container.querySelectorAll('.order-item:not(.dragging)')];
+    return els.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) return { offset, element: child };
+      else return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  // Build list on first load
+  buildOrderList();
+</script>
 
   // Init
   loadProducts();
