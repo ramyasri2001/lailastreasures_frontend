@@ -65,35 +65,28 @@
 <script>
   const BASE_API = "https://lailastreasures.onrender.com";
 
-  // Header: show logged-in user (optional)
-  (async function initHeaderUser(){
-    try {
-      const r = await fetch(`${BASE_API}/api/users/me`, { credentials: 'include' });
-      if (r.ok) {
-        const u = await r.json();
-        if (u && u.name) document.getElementById("userNameDisplay").textContent = `(${u.name})`;
-      }
-    } catch {}
+  // Header name: use localStorage (since /me doesn’t return name)
+  (function initHeaderUser(){
+    const name = localStorage.getItem("userName");
+    if (name) document.getElementById("userNameDisplay").textContent = `(${name})`;
   })();
 
-  // Logout (server cookie)
+  // Logout (server cookie + UI)
   document.getElementById('logoutBtn').addEventListener('click', async (e) => {
     e.preventDefault();
     try { await fetch(`${BASE_API}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
+    localStorage.removeItem('userName');
     window.location.href = "login.html";
   });
 
   // --- URL / state ---
   const urlParams = new URLSearchParams(window.location.search);
   const productName = urlParams.get("name") || "Grill";
-  const urlMaterial = urlParams.get("material"); // passed from category pages
+  const urlMaterial = urlParams.get("material"); // from category pages
   let material = urlMaterial || "10K Gold";
 
   let selectedTopTeeth = [1]; // preselect 1 to show price
   let selectedBottomTeeth = [];
-
-  // local fallback cache (optional)
-  const adminProducts = JSON.parse(localStorage.getItem("adminProducts")) || [];
 
   // DOM
   const imgEl = document.getElementById("productImage");
@@ -106,7 +99,6 @@
   const goldWrap = document.getElementById("goldMaterialSelectContainer");
   const goldLabel = document.getElementById("goldMaterialLabel");
   const goldSelect = document.getElementById("goldMaterialSelect");
-  const saveBtn = document.getElementById("saveBtn");
 
   nameEl.textContent = productName;
 
@@ -138,21 +130,15 @@
 
   // ----- Data helpers -----
   async function fetchProductBy(name, mat) {
-    try {
-      const qs = new URLSearchParams({ name, material: mat });
-      const res = await fetch(`${BASE_API}/api/products?${qs.toString()}`, { credentials: "omit" });
-      if (!res.ok) throw new Error("bad status");
-      const items = await res.json();
-      return items && items[0] ? items[0] : null;
-    } catch {
-      // fallback to local cache
-      const match = adminProducts.find(p => p.name === name && p.material === mat);
-      return match || null;
-    }
+    const qs = new URLSearchParams({ name, material: mat });
+    const res = await fetch(`${BASE_API}/api/products?${qs.toString()}`, { credentials: "omit" });
+    if (!res.ok) return null;
+    const items = await res.json();
+    return items && items[0] ? items[0] : null;
   }
 
   async function loadInitialProduct() {
-    // Configure dropdown depending on category/material
+    // Configure dropdown depending on material
     const matLower = material.toLowerCase();
 
     if (matLower.includes("silver")) {
@@ -219,6 +205,14 @@
   }
 
   async function addToCart() {
+    // must be logged in (cookie)
+    const me = await fetch(`${BASE_API}/api/users/me`, { credentials: 'include' }).then(r=>r.json()).catch(()=>({loggedIn:false}));
+    if (!me.loggedIn) {
+      alert("Please log in to save your design.");
+      window.location.href = "login.html";
+      return;
+    }
+
     const top = selectedTopTeeth.length;
     const bottom = selectedBottomTeeth.length;
     if (top + bottom === 0) {
@@ -253,7 +247,7 @@
       const res = await fetch(`${BASE_API}/api/cart`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',              // <<— uses auth cookie
+        credentials: 'include',
         body: JSON.stringify(item)
       });
       if (res.status === 401) {

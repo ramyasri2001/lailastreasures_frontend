@@ -36,34 +36,19 @@
 <script>
   const API_BASE = "https://lailastreasures.onrender.com";
 
-  // show user name (try /me; fallback to localStorage name if you want)
-  async function initHeaderUser() {
-    try {
-      const r = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' });
-      if (r.ok) {
-        const u = await r.json();
-        if (u && u.name) document.getElementById("userNameDisplay").textContent = `(${u.name})`;
-      } else {
-        const name = localStorage.getItem("userName");
-        if (name) document.getElementById("userNameDisplay").textContent = `(${name})`;
-      }
-    } catch {
-      const name = localStorage.getItem("userName");
-      if (name) document.getElementById("userNameDisplay").textContent = `(${name})`;
-    }
-  }
+  // show user name from localStorage (since /me doesn't return a name)
+  (function initHeaderUser() {
+    const name = localStorage.getItem("userName");
+    if (name) document.getElementById("userNameDisplay").textContent = `(${name})`;
+  })();
 
   document.getElementById("logoutBtn").addEventListener("click", async (e) => {
     e.preventDefault();
-    try {
-      await fetch(`${API_BASE}/api/users/logout`, { method: 'POST', credentials: 'include' });
-    } catch {}
-    // optional: clear just UI name
+    try { await fetch(`${API_BASE}/api/users/logout`, { method: 'POST', credentials: 'include' }); } catch {}
     localStorage.removeItem("userName");
     window.location.href = "login.html";
   });
 
-  // Normalize image path (handles "xyz.jpg" vs "assets/images/xyz.jpg")
   function normalizeImg(src) {
     if (!src) return "";
     if (src.startsWith("http") || src.startsWith("assets/")) return src;
@@ -76,12 +61,13 @@
     document.getElementById("totalPrice").textContent = "0.00";
 
     try {
-      const res = await fetch(`${API_BASE}/api/cart`, { credentials: 'include' });
-      if (res.status === 401) {
-        alert("Please log in to see your cart.");
-        window.location.href = "login.html";
+      const me = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' }).then(r=>r.json()).catch(()=>({loggedIn:false}));
+      if (!me.loggedIn) {
+        container.innerHTML = "<p>Please log in to see your cart.</p>";
         return;
       }
+
+      const res = await fetch(`${API_BASE}/api/cart`, { credentials: 'include' });
       if (!res.ok) throw new Error(`Failed to load cart (${res.status})`);
       const items = await res.json();
       renderCart(items);
@@ -152,10 +138,7 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    await initHeaderUser();
-    await loadCart();
-  });
+  document.addEventListener("DOMContentLoaded", loadCart);
 </script>
 </body>
 </html>
