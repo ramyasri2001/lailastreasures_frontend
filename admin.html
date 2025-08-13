@@ -73,7 +73,7 @@
     <div id="productList" style="margin-top:1rem;"></div>
   </div>
 
-  <!-- ✅ Arrange Designs (drag & drop) -->
+  <!-- Arrange Designs (drag & drop) -->
   <div class="section">
     <h2>Arrange Designs (drag & drop)</h2>
 
@@ -102,15 +102,30 @@
   </div>
 
 <script>
-  // ---- CONFIG: Backend base URL ----
-  const API_BASE = 'https://lailastreasures.onrender.com';      // Render backend base
-  const PRODUCTS_API = `${API_BASE}/api/products`;               // products route
-  const ORDER_API = `${API_BASE}/api/order`;                     // order route (PUT/GET)
+  // ---- Backend base URL ----
+  const API_BASE = 'https://lailastreasures.onrender.com';
+  const PRODUCTS_API = `${API_BASE}/api/products`;
+  const ORDER_API    = `${API_BASE}/api/order`;
 
-  // ---- Auth gate ----
-  if (!localStorage.getItem("userLoggedIn")) {
-    window.location.href = "login.html";
-  }
+  // ---- Admin gate (requires login cookie). When backend exposes isAdmin, also check me.isAdmin === true.
+  (async function guard(){
+    try {
+      const r = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' });
+      const me = r.ok ? await r.json() : { loggedIn:false };
+      if (!me.loggedIn) {
+        alert('Admins only'); location.href = 'login.html';
+        return;
+      }
+      // If later you add isAdmin on backend, uncomment:
+      // if (!me.isAdmin) { alert('Admins only'); location.href='login.html'; return; }
+
+      // Load sections after guard passes
+      buildOrderList();
+      loadProducts();
+    } catch (e) {
+      alert('Please log in as admin'); location.href = 'login.html';
+    }
+  })();
 
   // Utilities
   const $ = sel => document.querySelector(sel);
@@ -121,7 +136,8 @@
     const list = $('#productList');
     list.innerHTML = 'Loading...';
     try {
-      const res = await fetch(PRODUCTS_API, { credentials: 'omit' });
+      // listing can be public; keep no-credentials
+      const res = await fetch(PRODUCTS_API);
       if (!res.ok) throw new Error(`List failed: ${res.status}`);
       const items = await res.json();
 
@@ -153,7 +169,6 @@
     } catch (err) {
       console.error(err);
       list.innerHTML = `<p class="error">Error loading products: ${err.message}</p>`;
-      alert('Failed to fetch (list). Check CORS and backend.');
     }
   }
 
@@ -173,6 +188,7 @@
     $('#formError').textContent = '';
   });
 
+  // Save (upsert)
   document.getElementById('productForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('#formError').textContent = '';
@@ -182,8 +198,6 @@
     const material = $('#productMaterial').value.trim();
     const price = parseFloat($('#productPrice').value);
     const category = $('#productCategory').value;
-
-    // derive a designKey from name (consistent across materials)
     const designKey = slugify(name);
 
     const payload = { name, designKey, category, material, price, img };
@@ -192,6 +206,7 @@
       const res = await fetch(PRODUCTS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',            // send auth cookie
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
@@ -205,20 +220,24 @@
     } catch (err) {
       console.error(err);
       $('#formError').textContent = err.message;
-      alert('Failed to fetch (save). Check backend URL/CORS.');
+      alert('Failed to save. Check login & CORS.');
     }
   });
 
+  // Delete
   async function deleteProduct(id) {
     if (!id) return alert('Missing id for delete.');
     if (!confirm('Delete this product?')) return;
     try {
-      const res = await fetch(`${PRODUCTS_API}/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${PRODUCTS_API}/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'           // send auth cookie
+      });
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
       loadProducts();
     } catch (err) {
       console.error(err);
-      alert('Failed to fetch (delete).');
+      alert('Failed to delete. Check login & CORS.');
     }
   }
   window.deleteProduct = deleteProduct;
@@ -230,24 +249,27 @@
   document.getElementById('saveOrder').addEventListener('click', saveOrder);
 
   async function fetchProductsByCategory(category) {
+    // reading products can be public
     const res = await fetch(`${PRODUCTS_API}?category=${encodeURIComponent(category)}`);
     if (!res.ok) throw new Error('Failed to fetch products');
     return res.json();
   }
   async function fetchOrder(category) {
-    // Expect backend GET /api/order?category=...
-    const res = await fetch(`${ORDER_API}?category=${encodeURIComponent(category)}`);
+    // order is admin-only → include cookie
+    const res = await fetch(`${ORDER_API}?category=${encodeURIComponent(category)}`, {
+      credentials: 'include'
+    });
     if (!res.ok) {
-      // If 404 or similar, treat as empty order
-      return { category, order: [] };
+      return { category, order: [] }; // treat as empty if not set yet
     }
-    return res.json(); // { category, order: [] }
+    return res.json();
   }
   async function putOrder(category, order) {
-    // Expect backend PUT /api/order  with {category, order: [designKey,...]}
+    // admin-only → include cookie
     const res = await fetch(ORDER_API, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ category, order })
     });
     if (!res.ok) throw new Error('Failed to save order');
@@ -307,7 +329,8 @@
 
   async function saveOrder() {
     const category = orderCategoryEl.value;
-    const designKeys = [...orderListEl.querySelectorAll('.order-item')].map(li => li.dataset.designKey);
+    const designKeys = [...orderListEl.querySelectorAll('.order-item')]
+      .map(li => li.dataset.designKey);
 
     try {
       await putOrder(category, designKeys);
@@ -341,10 +364,6 @@
       else return closest;
     }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
-
-  // Initial loads
-  buildOrderList();
-  loadProducts();
 </script>
 </body>
 </html>
