@@ -21,25 +21,10 @@
       <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
     </ul>
   </nav>
 </header>
-
-<script>
-  function handleLogout() {
-    localStorage.removeItem("userLoggedIn");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
-    alert("You have been logged out.");
-    window.location.href = "login.html";
-  }
-  const userName = localStorage.getItem("userName");
-  const isLoggedIn = localStorage.getItem("userLoggedIn");
-  if (userName && isLoggedIn === "true") {
-    document.getElementById("userNameDisplay").textContent = `(${userName})`;
-  }
-</script>
 
 <main style="padding: 2rem;">
   <div class="product-container">
@@ -64,7 +49,7 @@
       <div class="price">Total Price: $<span id="priceValue">0.00</span></div>
       <div id="discountNote" class="discount"></div><br>
 
-      <button onclick="addToCart()">Save Design</button>
+      <button id="saveBtn">Save Design</button>
     </div>
   </div>
 
@@ -79,15 +64,35 @@
 
 <script>
   const BASE_API = "https://lailastreasures.onrender.com";
+
+  // Header: show logged-in user (optional)
+  (async function initHeaderUser(){
+    try {
+      const r = await fetch(`${BASE_API}/api/users/me`, { credentials: 'include' });
+      if (r.ok) {
+        const u = await r.json();
+        if (u && u.name) document.getElementById("userNameDisplay").textContent = `(${u.name})`;
+      }
+    } catch {}
+  })();
+
+  // Logout (server cookie)
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try { await fetch(`${BASE_API}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
+    window.location.href = "login.html";
+  });
+
+  // --- URL / state ---
   const urlParams = new URLSearchParams(window.location.search);
   const productName = urlParams.get("name") || "Grill";
   const urlMaterial = urlParams.get("material"); // passed from category pages
-
   let material = urlMaterial || "10K Gold";
-  let selectedTopTeeth = [1];   // preselect 1 tooth so price shows
+
+  let selectedTopTeeth = [1]; // preselect 1 to show price
   let selectedBottomTeeth = [];
 
-  // local fallback cache
+  // local fallback cache (optional)
   const adminProducts = JSON.parse(localStorage.getItem("adminProducts")) || [];
 
   // DOM
@@ -101,6 +106,7 @@
   const goldWrap = document.getElementById("goldMaterialSelectContainer");
   const goldLabel = document.getElementById("goldMaterialLabel");
   const goldSelect = document.getElementById("goldMaterialSelect");
+  const saveBtn = document.getElementById("saveBtn");
 
   nameEl.textContent = productName;
 
@@ -146,7 +152,7 @@
   }
 
   async function loadInitialProduct() {
-    // Configure the dropdown depending on category/material
+    // Configure dropdown depending on category/material
     const matLower = material.toLowerCase();
 
     if (matLower.includes("silver")) {
@@ -174,7 +180,7 @@
       goldSelect.onchange = handleMaterialChange;
     }
 
-    await updatePrice(); // will also load image/price
+    await updatePrice(); // also sets image
   }
 
   function handleMaterialChange(e) {
@@ -186,7 +192,7 @@
   async function updatePrice() {
     materialLabelEl.textContent = material;
 
-    // Load product record for the chosen material
+    // Load product record for chosen material
     const rec = await fetchProductBy(productName, material);
 
     // Update image
@@ -196,7 +202,7 @@
       imgEl.src = "assets/images/gold1.jpg";
     }
 
-    // Compute totals
+    // Totals
     const top = selectedTopTeeth.length;
     const bottom = selectedBottomTeeth.length;
     const total = top + bottom;
@@ -213,13 +219,6 @@
   }
 
   async function addToCart() {
-    const isLoggedIn = localStorage.getItem("userLoggedIn");
-    if (isLoggedIn !== "true") {
-      alert("Please log in to save your design.");
-      window.location.href = "login.html";
-      return;
-    }
-
     const top = selectedTopTeeth.length;
     const bottom = selectedBottomTeeth.length;
     if (top + bottom === 0) {
@@ -250,13 +249,30 @@
       price
     };
 
-    const cart = JSON.parse(localStorage.getItem("savedGrillz")) || [];
-    cart.push(item);
-    localStorage.setItem("savedGrillz", JSON.stringify(cart));
-    alert("Design saved!");
-    window.location.href = "cart.html";
+    try {
+      const res = await fetch(`${BASE_API}/api/cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',              // <<— uses auth cookie
+        body: JSON.stringify(item)
+      });
+      if (res.status === 401) {
+        alert("Please log in to save your design.");
+        window.location.href = "login.html";
+        return;
+      }
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`Save failed: ${res.status} ${t}`);
+      }
+      alert("Design saved!");
+      window.location.href = "cart.html";
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
+  document.getElementById("saveBtn").addEventListener("click", addToCart);
   window.onload = loadInitialProduct;
 </script>
 </body>

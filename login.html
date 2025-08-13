@@ -4,14 +4,10 @@
   <title>Login - Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    main {
-      max-width: 400px;
-      margin: auto;
-      padding-top: 3rem;
-    }
-    input {
-      width: 100%;
-    }
+    main { max-width: 400px; margin: auto; padding-top: 3rem; }
+    input { width: 100%; }
+    .inline-eye { position: relative; }
+    #toggleLoginPassword { position:absolute; right:.5rem; top:.6rem; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -30,49 +26,55 @@
     <h1>Login</h1>
     <form id="loginForm">
       <input type="email" id="email" placeholder="Email" required>
-      <input type="password" id="password" placeholder="Enter your password" required><span id="toggleLoginPassword" style = "cursor: pointer;">👁️</span>
+      <div class="inline-eye">
+        <input type="password" id="password" placeholder="Enter your password" required>
+        <span id="toggleLoginPassword">👁️</span>
+      </div>
       <button type="submit">Login</button>
     </form>
-    <p>
-  <a href="forgot-password.html">Forgot your password?</a>
-</p>
+    <p><a href="forgot-password.html">Forgot your password?</a></p>
     <p>Don't have an account? <a href="register.html">Create one</a>.</p>
   </main>
 
   <script>
+    const API_BASE = "https://lailastreasures.onrender.com";
+
     document.getElementById("loginForm").onsubmit = async function (e) {
       e.preventDefault();
-
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
-     
+
       try {
-        const res = await fetch("https://lailastreasures.onrender.com/api/users/login", {
+        const res = await fetch(`${API_BASE}/api/users/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",              // ← IMPORTANT (sets auth cookie)
           body: JSON.stringify({ email, password })
         });
 
         if (res.ok) {
-          const data = await res.json();
+          const data = await res.json();       // { message, name? }
+          // purely for header display (optional)
+          if (data && data.name) localStorage.setItem("userName", data.name);
           alert("Login successful!");
-          localStorage.setItem("userLoggedIn", "true");
-          localStorage.setItem("userName", data.name);
           window.location.href = "grillz.html";
-        } else {
+        } else if (res.status === 401) {
           alert("Invalid email or password.");
+        } else {
+          const t = await res.text();
+          alert("Login failed: " + t);
         }
       } catch (err) {
         alert("Server error. Please try again.");
       }
     };
+
     document.getElementById("toggleLoginPassword").addEventListener("click", function () {
       const passwordInput = document.getElementById("password");
       const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
       passwordInput.setAttribute("type", type);
       this.textContent = type === "password" ? "👁️" : "🙈";
-      });
+    });
   </script>
-
 </body>
 </html>
