@@ -1,95 +1,153 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
+  <title>Gold Grillz – Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .product-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:2rem;margin-top:2rem}
+    .product{width:250px;text-align:center}
+    .product img{width:100%;height:180px;object-fit:cover;border-radius:8px}
+  </style>
 </head>
 <body>
 <header>
   <div class="logo">Laila's Treasures</div>
   <nav>
     <ul>
-      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><span id="userNameDisplay" style="font-weight:bold;margin-left:10px;color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+      <li><a href="#" id="logoutBtn">Logout</a></li>
     </ul>
   </nav>
 </header>
+
 <main>
   <h1 style="text-align:center;">Gold Grillz Collection</h1>
-  <div id="productGallery" class="product-gallery" style="display:flex;flex-wrap:wrap;justify-content:center;gap:2rem;margin-top:2rem;"></div>
+  <div id="productGallery" class="product-gallery"></div>
 </main>
 
 <script>
-const API = "https://lailastreasures.onrender.com";
-const CATEGORY = "gold-grillz.html";
+  const API_BASE = "https://lailastreasures.onrender.com";
+  const CATEGORY = "gold-grillz.html";
 
-function handleLogout(){
-  localStorage.removeItem("userLoggedIn");
-  localStorage.removeItem("userName");
-  localStorage.removeItem("userEmail");
-  alert("You have been logged out.");
-  location.href="login.html";
-}
-const userName = localStorage.getItem("userName");
-if (userName && localStorage.getItem("userLoggedIn")==="true"){
-  document.getElementById("userNameDisplay").textContent = `(${userName})`;
-}
+  // Header name (optional)
+  (function initHeader(){
+    const userName = localStorage.getItem("userName");
+    const isLoggedIn = localStorage.getItem("userLoggedIn");
+    if (userName && isLoggedIn === "true") {
+      document.getElementById("userNameDisplay").textContent = `(${userName})`;
+    }
+  })();
 
-async function load(){
-  const gallery = document.getElementById("productGallery");
-
-  async function fromBackend(){
-    const r = await fetch(`${API}/api/products?category=${encodeURIComponent(CATEGORY)}`);
-    if(!r.ok) throw new Error("backend");
-    return r.json();
-  }
-  function fromLocal(){
-    const all = JSON.parse(localStorage.getItem("adminProducts"))||[];
-    return all.filter(p=>p.category===CATEGORY);
-  }
-
-  let items=[];
-  try { items = await fromBackend(); }
-  catch { items = fromLocal(); }
-
-  if(!items.length){ gallery.innerHTML="<p>No products found.</p>"; return; }
-
-  // de-dupe by name
-  const byName = new Map();
-  for(const p of items){ if(!byName.has(p.name)) byName.set(p.name, p); }
-  const list = [...byName.values()];
-
-  list.forEach(p=>{
-    const img = p.img?.startsWith("http") ? p.img : `assets/images/${p.img}`;
-    const card = document.createElement("div");
-    card.className="product";
-    card.innerHTML = `
-      <img src="${img}" alt="${p.name}">
-      <h2>${p.name}</h2>
-      <a href="product.html?name=${encodeURIComponent(p.name)}&material=${encodeURIComponent('10K Gold')}">
-        <button>View</button>
-      </a>`;
-    gallery.appendChild(card);
+  document.getElementById("logoutBtn").addEventListener("click", async (e)=>{
+    e.preventDefault();
+    try { await fetch(`${API_BASE}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
+    localStorage.removeItem("userLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    alert("You have been logged out.");
+    location.href = "login.html";
   });
-}
-  function loadSavedOrder(category) {
+
+  function normalizeImg(src){
+    if (!src) return "assets/images/gold1.jpg";
+    if (src.startsWith("http") || src.startsWith("assets/")) return src;
+    return "assets/images/" + src;
+  }
+
+  // Fallback order from localStorage (used only if backend order not available)
+  function loadLocalOrder(category){
     return JSON.parse(localStorage.getItem(`order:${category}`)) || [];
   }
 
-  // After you compute `list` (unique designs) and have `currentPage` set:
-  const savedOrder = loadSavedOrder(currentPage);
-  list.sort((a, b) => {
-    const ia = savedOrder.indexOf(a.name);
-    const ib = savedOrder.indexOf(b.name);
-    const A = ia === -1 ? 999999 : ia;
-    const B = ib === -1 ? 999999 : ib;
-    return A - B || a.name.localeCompare(b.name);
-  });
+  // Unique by designKey (preferred) then by name
+  function uniqueDesigns(items){
+    const map = new Map();
+    for (const p of items){
+      const key = (p.designKey || p.name || "").toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, p);
+    }
+    return [...map.values()];
+  }
 
-  // ...then render cards as you do now
+  async function fetchProducts(){
+    const r = await fetch(`${API_BASE}/api/products?category=${encodeURIComponent(CATEGORY)}`);
+    if (!r.ok) throw new Error("Failed to load products");
+    return r.json();
+  }
 
-load();
+  async function fetchOrder(){
+    // { category, order: [designKey,...] }
+    const r = await fetch(`${API_BASE}/api/order?category=${encodeURIComponent(CATEGORY)}`, { credentials:'include' });
+    if (!r.ok) return { category:CATEGORY, order: [] }; // not set yet → empty
+    return r.json();
+  }
+
+  async function load(){
+    const gallery = document.getElementById("productGallery");
+    gallery.innerHTML = "Loading…";
+
+    // Try backend products first; if that fails, fallback to local admin cache (just in case)
+    let products = [];
+    try {
+      products = await fetchProducts();
+    } catch {
+      const local = JSON.parse(localStorage.getItem("adminProducts")) || [];
+      products = local.filter(p => p.category === CATEGORY);
+    }
+
+    if (!products.length){
+      gallery.innerHTML = "<p>No products found.</p>";
+      return;
+    }
+
+    // de‑dupe
+    const designs = uniqueDesigns(products);
+
+    // order: try backend, fallback to local order
+    let orderKeys = [];
+    try {
+      const ord = await fetchOrder();
+      orderKeys = Array.isArray(ord.order) ? ord.order : [];
+    } catch {
+      orderKeys = loadLocalOrder(CATEGORY);
+    }
+
+    designs.sort((a,b)=>{
+      const ka = (a.designKey || a.name || "").toLowerCase();
+      const kb = (b.designKey || b.name || "").toLowerCase();
+      const ia = orderKeys.indexOf(ka);
+      const ib = orderKeys.indexOf(kb);
+      const A = ia === -1 ? Number.POSITIVE_INFINITY : ia;
+      const B = ib === -1 ? Number.POSITIVE_INFINITY : ib;
+      if (A !== B) return A - B;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+    // render
+    gallery.innerHTML = "";
+    designs.forEach(p=>{
+      const card = document.createElement("div");
+      card.className = "product";
+      const img = normalizeImg(p.img);
+      const name = p.name || "Design";
+      // For Gold page we preselect a gold material (you can change default)
+      const defaultGold = "10K Gold";
+      card.innerHTML = `
+        <img src="${img}" alt="${name}">
+        <h2>${name}</h2>
+        <a href="product.html?name=${encodeURIComponent(name)}&material=${encodeURIComponent(defaultGold)}">
+          <button>View</button>
+        </a>
+      `;
+      gallery.appendChild(card);
+    });
+  }
+
+  load();
 </script>
 </body>
 </html>

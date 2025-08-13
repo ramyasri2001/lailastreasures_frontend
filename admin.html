@@ -11,20 +11,17 @@
     input, select { margin-bottom: 0.5rem; padding: 0.4rem; width: 100%; }
     button { padding: 0.5rem 1rem; margin-top: 0.5rem; background: gold; border: none; font-weight: bold; cursor: pointer; }
     img.product-preview { width: 60px; height: auto; border-radius: 4px; }
-    .message-box { margin-bottom: 1rem; border: 1px solid #ddd; padding: 1rem; background: #f9f9f9; }
     .error { color: #b00020; margin-top: .5rem; }
 
     /* Drag & drop ordering */
     .order-item {
       display:flex; align-items:center; gap:.75rem;
-      padding:.6rem .8rem; border-bottom:1px solid #eee; cursor:grab;
-      background:#fff;
+      padding:.6rem .8rem; border-bottom:1px solid #eee; cursor:grab; background:#fff;
     }
     .order-item:last-child { border-bottom:none; }
     .order-handle {
-      width:12px; height:18px; background:repeating-linear-gradient(
-        to bottom, #bbb, #bbb 3px, #eee 3px, #eee 6px
-      ); border-radius:3px; flex:0 0 12px;
+      width:12px; height:18px; background:repeating-linear-gradient(to bottom,#bbb,#bbb 3px,#eee 3px,#eee 6px);
+      border-radius:3px; flex:0 0 12px;
     }
     .order-item.dragging { opacity:.6; }
   </style>
@@ -38,7 +35,6 @@
 
     <form id="productForm">
       <input type="hidden" id="editId">
-
       <input type="text" id="productName" placeholder="Product Name" required>
       <input type="text" id="productImage" placeholder="Image filename (e.g. gold1.jpg)" required>
 
@@ -63,7 +59,7 @@
         <option value="rosegold-grillz.html">Rose Gold</option>
       </select>
 
-      <div style="display:flex; gap: .6rem;">
+      <div style="display:flex; gap:.6rem;">
         <button type="submit">Save Product</button>
         <button type="button" id="clearBtn">Clear</button>
       </div>
@@ -96,274 +92,251 @@
     <p style="margin-top:.5rem;color:#666;">Tip: drag items to reorder; click “Save Order”.</p>
   </div>
 
-  <div class="section">
-    <h2>Customer Messages</h2>
-    <div id="messageList"><em>Messages migration coming later</em></div>
-  </div>
+  <script>
+    // ---- Backend base URL ----
+    const API_BASE = 'https://lailastreasures.onrender.com';
+    const PRODUCTS_API = `${API_BASE}/api/products`;
+    const ORDER_API    = `${API_BASE}/api/order`;
 
-<script>
-  // ---- Backend base URL ----
-  const API_BASE = 'https://lailastreasures.onrender.com';
-  const PRODUCTS_API = `${API_BASE}/api/products`;
-  const ORDER_API    = `${API_BASE}/api/order`;
-
-  // ---- Admin gate (requires login cookie). When backend exposes isAdmin, also check me.isAdmin === true.
-  (async function guard(){
-    try {
-      const r = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' });
-      const me = r.ok ? await r.json() : { loggedIn:false };
-      if (!me.loggedIn) {
-        alert('Admins only'); location.href = 'login.html';
-        return;
+    // ---- Admin gate (requires login cookie and, if available, isAdmin flag)
+    (async function guard(){
+      try {
+        const r = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' });
+        const me = r.ok ? await r.json() : { loggedIn:false };
+        if (!me.loggedIn || (typeof me.isAdmin !== 'undefined' && !me.isAdmin)) {
+          alert('Admins only'); location.href = 'login.html'; return;
+        }
+        // load only after we know we’re allowed
+        buildOrderList();
+        loadProducts();
+      } catch {
+        alert('Please log in as admin'); location.href = 'login.html';
       }
-      // If later you add isAdmin on backend, uncomment:
-      // if (!me.isAdmin) { alert('Admins only'); location.href='login.html'; return; }
+    })();
 
-      // Load sections after guard passes
-      buildOrderList();
-      loadProducts();
-    } catch (e) {
-      alert('Please log in as admin'); location.href = 'login.html';
+    // Utilities
+    const $ = sel => document.querySelector(sel);
+    const slugify = s => s.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+
+    // ===== Products list & CRUD =====
+    async function loadProducts() {
+      const list = $('#productList');
+      list.innerHTML = 'Loading...';
+      try {
+        // listing can be public
+        const res = await fetch(PRODUCTS_API);
+        if (!res.ok) throw new Error(`List failed: ${res.status}`);
+        const items = await res.json();
+
+        if (!items.length) {
+          list.innerHTML = "<p>No products added yet.</p>";
+          return;
+        }
+
+        let html = `<table><thead>
+          <tr><th>Name</th><th>Image</th><th>Material</th><th>Price</th><th>Category</th><th>Actions</th></tr>
+        </thead><tbody>`;
+
+        items.forEach(p => {
+          html += `<tr>
+            <td>${p.name}</td>
+            <td><img src="assets/images/${p.img}" class="product-preview" alt="${p.name}"></td>
+            <td>${p.material || ''}</td>
+            <td>$${Number(p.price || 0).toFixed(2)}</td>
+            <td>${(p.category || '').replace('.html','')}</td>
+            <td>
+              <button onclick='fillForm(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Edit</button>
+              <button onclick="deleteProduct('${p._id}')" style="background:red;color:#fff;">Delete</button>
+            </td>
+          </tr>`;
+        });
+
+        html += "</tbody></table>";
+        list.innerHTML = html;
+      } catch (err) {
+        console.error(err);
+        list.innerHTML = `<p class="error">Error loading products: ${err.message}</p>`;
+      }
     }
-  })();
 
-  // Utilities
-  const $ = sel => document.querySelector(sel);
-  const slugify = s => s.toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
-
-  // ===== Products list & CRUD =====
-  async function loadProducts() {
-    const list = $('#productList');
-    list.innerHTML = 'Loading...';
-    try {
-      // listing can be public; keep no-credentials
-      const res = await fetch(PRODUCTS_API);
-      if (!res.ok) throw new Error(`List failed: ${res.status}`);
-      const items = await res.json();
-
-      if (!items.length) {
-        list.innerHTML = "<p>No products added yet.</p>";
-        return;
-      }
-
-      let html = `<table><thead>
-        <tr><th>Name</th><th>Image</th><th>Material</th><th>Price</th><th>Category</th><th>Actions</th></tr>
-      </thead><tbody>`;
-
-      items.forEach(p => {
-        html += `<tr>
-          <td>${p.name}</td>
-          <td><img src="assets/images/${p.img}" class="product-preview" alt="${p.name}"></td>
-          <td>${p.material || ''}</td>
-          <td>$${Number(p.price || 0).toFixed(2)}</td>
-          <td>${(p.category || '').replace('.html','')}</td>
-          <td>
-            <button onclick='fillForm(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Edit</button>
-            <button onclick="deleteProduct('${p._id}')" style="background:red;color:#fff;">Delete</button>
-          </td>
-        </tr>`;
-      });
-
-      html += "</tbody></table>";
-      list.innerHTML = html;
-    } catch (err) {
-      console.error(err);
-      list.innerHTML = `<p class="error">Error loading products: ${err.message}</p>`;
+    function fillForm(p) {
+      $('#editId').value = p._id || '';
+      $('#productName').value = p.name || '';
+      $('#productImage').value = p.img || '';
+      $('#productMaterial').value = p.material || '';
+      $('#productPrice').value = p.price || '';
+      $('#productCategory').value = p.category || '';
+      $('#formError').textContent = '';
     }
-  }
 
-  function fillForm(p) {
-    $('#editId').value = p._id || '';
-    $('#productName').value = p.name || '';
-    $('#productImage').value = p.img || '';
-    $('#productMaterial').value = p.material || '';
-    $('#productPrice').value = p.price || '';
-    $('#productCategory').value = p.category || '';
-    $('#formError').textContent = '';
-  }
-
-  $('#clearBtn').addEventListener('click', () => {
-    $('#productForm').reset();
-    $('#editId').value = '';
-    $('#formError').textContent = '';
-  });
-
-  // Save (upsert)
-  document.getElementById('productForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    $('#formError').textContent = '';
-
-    const name = $('#productName').value.trim();
-    const img = $('#productImage').value.trim();
-    const material = $('#productMaterial').value.trim();
-    const price = parseFloat($('#productPrice').value);
-    const category = $('#productCategory').value;
-    const designKey = slugify(name);
-
-    const payload = { name, designKey, category, material, price, img };
-
-    try {
-      const res = await fetch(PRODUCTS_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',            // send auth cookie
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`Save failed: ${res.status} ${t}`);
-      }
-      alert('Saved!');
+    $('#clearBtn').addEventListener('click', () => {
       $('#productForm').reset();
       $('#editId').value = '';
-      loadProducts();
-    } catch (err) {
-      console.error(err);
-      $('#formError').textContent = err.message;
-      alert('Failed to save. Check login & CORS.');
-    }
-  });
-
-  // Delete
-  async function deleteProduct(id) {
-    if (!id) return alert('Missing id for delete.');
-    if (!confirm('Delete this product?')) return;
-    try {
-      const res = await fetch(`${PRODUCTS_API}/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'           // send auth cookie
-      });
-      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
-      loadProducts();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete. Check login & CORS.');
-    }
-  }
-  window.deleteProduct = deleteProduct;
-
-  // ===== Arrange Designs: Drag & Drop (uses /api/products and /api/order) =====
-  const orderCategoryEl = document.getElementById('orderCategory');
-  const orderListEl = document.getElementById('orderList');
-  document.getElementById('reloadOrder').addEventListener('click', buildOrderList);
-  document.getElementById('saveOrder').addEventListener('click', saveOrder);
-
-  async function fetchProductsByCategory(category) {
-    // reading products can be public
-    const res = await fetch(`${PRODUCTS_API}?category=${encodeURIComponent(category)}`);
-    if (!res.ok) throw new Error('Failed to fetch products');
-    return res.json();
-  }
-  async function fetchOrder(category) {
-    // order is admin-only → include cookie
-    const res = await fetch(`${ORDER_API}?category=${encodeURIComponent(category)}`, {
-      credentials: 'include'
+      $('#formError').textContent = '';
     });
-    if (!res.ok) {
-      return { category, order: [] }; // treat as empty if not set yet
-    }
-    return res.json();
-  }
-  async function putOrder(category, order) {
-    // admin-only → include cookie
-    const res = await fetch(ORDER_API, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ category, order })
+
+    // Save (upsert)
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#formError').textContent = '';
+
+      const name = $('#productName').value.trim();
+      const img = $('#productImage').value.trim();
+      const material = $('#productMaterial').value.trim();
+      const price = parseFloat($('#productPrice').value);
+      const category = $('#productCategory').value;
+      const designKey = slugify(name);
+      const payload = { name, designKey, category, material, price, img };
+
+      try {
+        const res = await fetch(PRODUCTS_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',                 // send auth cookie
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(`Save failed: ${res.status} ${t}`);
+        }
+        alert('Saved!');
+        $('#productForm').reset();
+        $('#editId').value = '';
+        loadProducts();
+      } catch (err) {
+        console.error(err);
+        $('#formError').textContent = err.message;
+        alert('Failed to save. Check login & CORS.');
+      }
     });
-    if (!res.ok) throw new Error('Failed to save order');
-    return res.json();
-  }
 
-  function uniqueByDesignKey(products) {
-    const map = new Map();
-    for (const p of products) {
-      if (p.designKey && !map.has(p.designKey)) map.set(p.designKey, p);
+    // Delete
+    async function deleteProduct(id) {
+      if (!id) return alert('Missing id for delete.');
+      if (!confirm('Delete this product?')) return;
+      try {
+        const res = await fetch(`${PRODUCTS_API}/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'                  // send auth cookie
+        });
+        if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+        loadProducts();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to delete. Check login & CORS.');
+      }
     }
-    return [...map.values()];
-  }
+    window.deleteProduct = deleteProduct;
 
-  async function buildOrderList() {
-    const category = orderCategoryEl.value;
-    orderListEl.innerHTML = '<li style="padding:.8rem;color:#666">Loading…</li>';
+    // ===== Arrange Designs: Drag & Drop =====
+    const orderCategoryEl = document.getElementById('orderCategory');
+    const orderListEl = document.getElementById('orderList');
+    document.getElementById('reloadOrder').addEventListener('click', buildOrderList);
+    document.getElementById('saveOrder').addEventListener('click', saveOrder);
 
-    try {
-      const [prods, ord] = await Promise.all([
-        fetchProductsByCategory(category),
-        fetchOrder(category)
-      ]);
-      const designs = uniqueByDesignKey(prods);
-      const savedOrder = Array.isArray(ord.order) ? ord.order : [];
-
-      // sort by saved order, then by name
-      designs.sort((a, b) => {
-        const ia = savedOrder.indexOf(a.designKey);
-        const ib = savedOrder.indexOf(b.designKey);
-        const A = ia === -1 ? 999999 : ia;
-        const B = ib === -1 ? 999999 : ib;
-        return A - B || a.name.localeCompare(b.name);
+    async function fetchProductsByCategory(category) {
+      const res = await fetch(`${PRODUCTS_API}?category=${encodeURIComponent(category)}`);
+      if (!res.ok) throw new Error('Failed to fetch products');
+      return res.json();
+    }
+    async function fetchOrder(category) {
+      const res = await fetch(`${ORDER_API}?category=${encodeURIComponent(category)}`, {
+        credentials: 'include'
       });
-
-      orderListEl.innerHTML = '';
-      designs.forEach(d => {
-        const li = document.createElement('li');
-        li.className = 'order-item';
-        li.draggable = true;
-        li.dataset.designKey = d.designKey;
-        li.innerHTML = `
-          <div class="order-handle" title="Drag"></div>
-          <img src="assets/images/${d.img}" alt="" style="width:48px;height:32px;object-fit:cover;border-radius:4px;">
-          <div style="font-weight:600">${d.name}</div>
-          <div style="color:#888;margin-left:auto">${d.material}</div>
-        `;
-        addDragEvents(li);
-        orderListEl.appendChild(li);
+      if (!res.ok) return { category, order: [] };
+      return res.json();
+    }
+    async function putOrder(category, order) {
+      const res = await fetch(ORDER_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ category, order })
       });
-
-    } catch (err) {
-      orderListEl.innerHTML = `<li style="padding:.8rem;color:#c00">Error: ${err.message}</li>`;
-      console.error(err);
+      if (!res.ok) throw new Error('Failed to save order');
+      return res.json();
     }
-  }
 
-  async function saveOrder() {
-    const category = orderCategoryEl.value;
-    const designKeys = [...orderListEl.querySelectorAll('.order-item')]
-      .map(li => li.dataset.designKey);
-
-    try {
-      await putOrder(category, designKeys);
-      alert('Order saved to backend!');
-    } catch (err) {
-      alert('Failed to save order: ' + err.message);
+    function uniqueByDesignKey(products) {
+      const map = new Map();
+      for (const p of products) if (p.designKey && !map.has(p.designKey)) map.set(p.designKey, p);
+      return [...map.values()];
     }
-  }
 
-  function addDragEvents(el) {
-    el.addEventListener('dragstart', e => {
-      el.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
+    async function buildOrderList() {
+      const category = orderCategoryEl.value;
+      orderListEl.innerHTML = '<li style="padding:.8rem;color:#666">Loading…</li>';
+
+      try {
+        const [prods, ord] = await Promise.all([
+          fetchProductsByCategory(category),
+          fetchOrder(category)
+        ]);
+        const designs = uniqueByDesignKey(prods);
+        const savedOrder = Array.isArray(ord.order) ? ord.order : [];
+
+        designs.sort((a, b) => {
+          const ia = savedOrder.indexOf(a.designKey);
+          const ib = savedOrder.indexOf(b.designKey);
+          const A = ia === -1 ? 999999 : ia;
+          const B = ib === -1 ? 999999 : ib;
+          return A - B || a.name.localeCompare(b.name);
+        });
+
+        orderListEl.innerHTML = '';
+        designs.forEach(d => {
+          const li = document.createElement('li');
+          li.className = 'order-item';
+          li.draggable = true;
+          li.dataset.designKey = d.designKey;
+          li.innerHTML = `
+            <div class="order-handle" title="Drag"></div>
+            <img src="assets/images/${d.img}" alt="" style="width:48px;height:32px;object-fit:cover;border-radius:4px;">
+            <div style="font-weight:600">${d.name}</div>
+            <div style="color:#888;margin-left:auto">${d.material}</div>
+          `;
+          addDragEvents(li);
+          orderListEl.appendChild(li);
+        });
+
+      } catch (err) {
+        orderListEl.innerHTML = `<li style="padding:.8rem;color:#c00">Error: ${err.message}</li>`;
+        console.error(err);
+      }
+    }
+
+    async function saveOrder() {
+      const category = orderCategoryEl.value;
+      const designKeys = [...orderListEl.querySelectorAll('.order-item')].map(li => li.dataset.designKey);
+      try {
+        await putOrder(category, designKeys);
+        alert('Order saved to backend!');
+      } catch (err) {
+        alert('Failed to save order: ' + err.message);
+      }
+    }
+
+    function addDragEvents(el) {
+      el.addEventListener('dragstart', e => { el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    }
+    orderListEl.addEventListener('dragover', e => {
+      e.preventDefault();
+      const dragging = orderListEl.querySelector('.dragging');
+      const after = getDragAfterElement(orderListEl, e.clientY);
+      if (!dragging) return;
+      if (after == null) orderListEl.appendChild(dragging);
+      else orderListEl.insertBefore(dragging, after);
     });
-    el.addEventListener('dragend', () => el.classList.remove('dragging'));
-  }
-  orderListEl.addEventListener('dragover', e => {
-    e.preventDefault();
-    const dragging = orderListEl.querySelector('.dragging');
-    const after = getDragAfterElement(orderListEl, e.clientY);
-    if (!dragging) return;
-    if (after == null) orderListEl.appendChild(dragging);
-    else orderListEl.insertBefore(dragging, after);
-  });
-  function getDragAfterElement(container, y) {
-    const els = [...container.querySelectorAll('.order-item:not(.dragging)')];
-    return els.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) return { offset, element: child };
-      else return closest;
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
-</script>
+    function getDragAfterElement(container, y) {
+      const els = [...container.querySelectorAll('.order-item:not(.dragging)')];
+      return els.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) return { offset, element: child };
+        else return closest;
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+  </script>
 </body>
 </html>
