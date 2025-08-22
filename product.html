@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Product - Laila's Treasures</title>
+  <meta charset="utf-8" />
+  <title>Product – Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
     .product-container { display:flex; gap:3rem; margin-top:2rem; align-items:flex-start; }
@@ -17,15 +18,18 @@
 <header>
   <div class="logo">Laila's Treasures</div>
   <nav>
-    <ul>
+    <ul id="navMenu">
       <li><a href="index.html">Home</a></li>
-      <li><span id="userNameDisplay" style="font-weight:bold; margin-left:10px; color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="grillz.html">Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" id="logoutBtn">Logout</a></li>
+      <!-- user items injected by auth-header.js -->
     </ul>
   </nav>
 </header>
+
+<!-- Reusable header controller -->
+<script src="assets/js/auth-header.js"></script>
 
 <main style="padding:2rem;">
   <div class="product-container">
@@ -66,19 +70,6 @@
 <script>
   const BASE_API = "https://lailastreasures.onrender.com";
 
-  // Small header nicety
-  (function headerName(){
-    const n = localStorage.getItem("userName");
-    if (n) document.getElementById("userNameDisplay").textContent = `(${n})`;
-  })();
-
-  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
-    e.preventDefault();
-    try { await fetch(`${BASE_API}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
-    localStorage.removeItem('userName');
-    location.href = "login.html";
-  });
-
   // URL / state
   const params = new URLSearchParams(location.search);
   const productName = params.get("name") || "Grill";
@@ -101,6 +92,7 @@
 
   nameEl.textContent = productName;
 
+  // Build teeth UI
   function buildTeeth(rowId, prefix) {
     const row = document.getElementById(rowId);
     for (let i = 1; i <= 10; i++) {
@@ -124,6 +116,7 @@
     updatePrice();
   }
 
+  // Backend product lookup
   async function fetchProductBy(name, mat) {
     try {
       const qs = new URLSearchParams({ name, material: mat });
@@ -132,6 +125,13 @@
       const items = await res.json();
       return items?.[0] || null;
     } catch { return null; }
+  }
+
+  function materialFallbackImage(mat) {
+    const m = (mat || "").toLowerCase();
+    if (m.includes("silver")) return "assets/images/silver1.jpg";
+    if (m.includes("rose")) return "assets/images/grillz3.jpg";
+    return "assets/images/gold1.jpg";
   }
 
   async function loadInitialProduct() {
@@ -173,7 +173,9 @@
     materialLabelEl.textContent = material;
     const rec = await fetchProductBy(productName, material);
 
-    imgEl.src = rec?.img ? `assets/images/${rec.img}` : "assets/images/gold1.jpg";
+    imgEl.src = rec?.img
+      ? (rec.img.startsWith("http") || rec.img.startsWith("assets/") ? rec.img : `assets/images/${rec.img}`)
+      : materialFallbackImage(material);
 
     const top = selectedTopTeeth.length;
     const bottom = selectedBottomTeeth.length;
@@ -191,9 +193,9 @@
   }
 
   async function addToCart() {
-    // must be logged in (cookie)
+    // require login (cookie)
     const me = await fetch(`${BASE_API}/api/users/me`, { credentials:'include' })
-                  .then(r=>r.json()).catch(()=>({loggedIn:false}));
+                      .then(r=>r.json()).catch(()=>({loggedIn:false}));
     if (!me.loggedIn) {
       alert("Please log in to save your design.");
       location.href = "login.html";
@@ -212,7 +214,9 @@
 
     const item = {
       name: productName,
-      img: rec.img ? `assets/images/${rec.img}` : imgEl.src,
+      img: rec.img
+        ? (rec.img.startsWith("http") || rec.img.startsWith("assets/") ? rec.img : `assets/images/${rec.img}`)
+        : imgEl.src,
       material,
       top,
       bottom,

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Gold Grillz – Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
@@ -14,14 +14,17 @@
 <header>
   <div class="logo">Laila's Treasures</div>
   <nav>
-    <ul>
-      <li><span id="userNameDisplay" style="font-weight:bold;margin-left:10px;color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
+    <ul id="navMenu">
+      <li><a href="grillz.html">Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" id="logoutBtn">Logout</a></li>
+      <!-- user items injected by auth-header.js -->
     </ul>
   </nav>
 </header>
+
+<!-- Reusable auth header (handles name/login/logout UI) -->
+<script src="assets/js/auth-header.js"></script>
 
 <main>
   <h1 style="text-align:center;">Gold Grillz Collection</h1>
@@ -32,34 +35,10 @@
   const API_BASE = "https://lailastreasures.onrender.com";
   const CATEGORY = "gold-grillz.html";
 
-  // Header name (optional)
-  (function initHeader(){
-    const userName = localStorage.getItem("userName");
-    const isLoggedIn = localStorage.getItem("userLoggedIn");
-    if (userName && isLoggedIn === "true") {
-      document.getElementById("userNameDisplay").textContent = `(${userName})`;
-    }
-  })();
-
-  document.getElementById("logoutBtn").addEventListener("click", async (e)=>{
-    e.preventDefault();
-    try { await fetch(`${API_BASE}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
-    localStorage.removeItem("userLoggedIn");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
-    alert("You have been logged out.");
-    location.href = "login.html";
-  });
-
   function normalizeImg(src){
     if (!src) return "assets/images/gold1.jpg";
     if (src.startsWith("http") || src.startsWith("assets/")) return src;
     return "assets/images/" + src;
-  }
-
-  // Fallback order from localStorage (used only if backend order not available)
-  function loadLocalOrder(category){
-    return JSON.parse(localStorage.getItem(`order:${category}`)) || [];
   }
 
   // Unique by designKey (preferred) then by name
@@ -79,10 +58,11 @@
     return r.json();
   }
 
+  // Public page can read order without auth; if your backend protects it, keep credentials:'include'
   async function fetchOrder(){
-    // { category, order: [designKey,...] }
-    const r = await fetch(`${API_BASE}/api/order?category=${encodeURIComponent(CATEGORY)}`, { credentials:'include' });
-    if (!r.ok) return { category:CATEGORY, order: [] }; // not set yet → empty
+    // Returns { category, order: [designKey,...] }
+    const r = await fetch(`${API_BASE}/api/order?category=${encodeURIComponent(CATEGORY)}`);
+    if (!r.ok) return { category:CATEGORY, order: [] }; // treat as empty if not set
     return r.json();
   }
 
@@ -90,7 +70,7 @@
     const gallery = document.getElementById("productGallery");
     gallery.innerHTML = "Loading…";
 
-    // Try backend products first; if that fails, fallback to local admin cache (just in case)
+    // Try backend products; if it fails, fallback to local admin cache (optional)
     let products = [];
     try {
       products = await fetchProducts();
@@ -104,16 +84,16 @@
       return;
     }
 
-    // de‑dupe
+    // De‑dupe
     const designs = uniqueDesigns(products);
 
-    // order: try backend, fallback to local order
+    // Sort by saved order (if present)
     let orderKeys = [];
     try {
       const ord = await fetchOrder();
-      orderKeys = Array.isArray(ord.order) ? ord.order : [];
+      orderKeys = Array.isArray(ord.order) ? ord.order.map(k => (k||'').toLowerCase()) : [];
     } catch {
-      orderKeys = loadLocalOrder(CATEGORY);
+      orderKeys = [];
     }
 
     designs.sort((a,b)=>{
@@ -127,14 +107,13 @@
       return (a.name || "").localeCompare(b.name || "");
     });
 
-    // render
+    // Render
     gallery.innerHTML = "";
     designs.forEach(p=>{
       const card = document.createElement("div");
       card.className = "product";
       const img = normalizeImg(p.img);
       const name = p.name || "Design";
-      // For Gold page we preselect a gold material (you can change default)
       const defaultGold = "10K Gold";
       card.innerHTML = `
         <img src="${img}" alt="${name}">
@@ -147,7 +126,7 @@
     });
   }
 
-  load();
+  document.addEventListener('DOMContentLoaded', load);
 </script>
 </body>
 </html>

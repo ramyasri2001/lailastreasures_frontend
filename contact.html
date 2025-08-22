@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Contact – Laila's Treasures</title>
@@ -13,15 +13,18 @@
 <header>
   <div class="logo">Laila's Treasures</div>
   <nav>
-    <ul>
+    <ul id="navMenu">
       <li><a href="index.html">Home</a></li>
-      <li><span id="userNameDisplay" style="font-weight:bold; margin-left:10px; color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="grillz.html">Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" id="logoutBtn">Logout</a></li>
+      <!-- user items injected by auth-header.js -->
     </ul>
   </nav>
 </header>
+
+<!-- Reusable auth header -->
+<script src="assets/js/auth-header.js"></script>
 
 <main>
   <h1>Contact Us</h1>
@@ -40,31 +43,21 @@
 <script>
   const API_BASE = 'https://lailastreasures.onrender.com';
 
-  // header nicety
-  (function headerName(){
-    const n = localStorage.getItem("userName");
-    if (n) document.getElementById("userNameDisplay").textContent = `(${n})`;
-  })();
+  // Prefill name/email for convenience
+  document.addEventListener("DOMContentLoaded", async () => {
+    const userName = localStorage.getItem("userName");   // just for UX display
+    const userEmail = localStorage.getItem("userEmail"); // optional convenience
 
-  document.getElementById("logoutBtn").addEventListener("click", async (e) => {
-    e.preventDefault();
-    try { await fetch(`${API_BASE}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
-    localStorage.removeItem("userName");
-    location.href = "login.html";
-  });
-
-  // load name/email if stored (just a convenience)
-  window.addEventListener("DOMContentLoaded", () => {
-    const userName = localStorage.getItem("userName");
-    const userEmail = localStorage.getItem("userEmail");
     if (userName) document.getElementById("contactName").value = userName;
     if (userEmail) document.getElementById("contactEmail").value = userEmail;
-    fillSummaryFromServerCart();
+
+    await fillSummaryFromServerCart();
   });
 
   async function fetchServerCart() {
     const me = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' })
-                .then(r=>r.json()).catch(()=>({loggedIn:false}));
+                .then(r => r.json())
+                .catch(() => ({ loggedIn:false }));
     if (!me.loggedIn) return [];
     const res = await fetch(`${API_BASE}/api/cart`, { credentials:'include' });
     if (!res.ok) return [];
@@ -73,13 +66,13 @@
 
   async function fillSummaryFromServerCart() {
     const items = await fetchServerCart();
-    const message = buildSummary(items);
-    document.getElementById("message").value = message;
+    document.getElementById("message").value = buildSummary(items);
   }
 
   function buildSummary(items) {
-    if (!items?.length) return "No designs saved.\n\nPlease let me know the next steps. Thank you!";
-
+    if (!items?.length) {
+      return "No designs saved.\n\nPlease let me know the next steps. Thank you!";
+    }
     let msg = "Hello,\n\nI am interested in the following grillz designs:\n\n";
     items.forEach((item, i) => {
       const price = Number(item.price) || 0;
@@ -96,25 +89,33 @@
     return msg;
   }
 
-  document.getElementById("contactForm").onsubmit = async function(e) {
+  document.getElementById("contactForm").onsubmit = async (e) => {
     e.preventDefault();
 
-    // require login to send (so message can be associated)
+    // require login to send
     const me = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' })
-                .then(r=>r.json()).catch(()=>({loggedIn:false}));
-    if (!me.loggedIn) { alert("Please log in first."); location.href="login.html"; return; }
+                .then(r => r.json())
+                .catch(() => ({ loggedIn:false }));
+    if (!me.loggedIn) {
+      alert("Please log in first.");
+      location.href = "login.html";
+      return;
+    }
 
     const name = document.getElementById("contactName").value.trim();
     const email = document.getElementById("contactEmail").value.trim();
     const message = document.getElementById("message").value.trim();
-    if (!name || !email || !message) { alert("Please fill out all fields."); return; }
+    if (!name || !email || !message) {
+      alert("Please fill out all fields.");
+      return;
+    }
 
     const btn = document.getElementById('sendBtn');
     const original = btn.textContent;
     btn.disabled = true; btn.textContent = 'Sending…';
 
     try {
-      const designs = await fetchServerCart();  // ← from server, not localStorage
+      const designs = await fetchServerCart(); // from server cart
       const res = await fetch(`${API_BASE}/api/messages`, {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
@@ -126,9 +127,9 @@
       }
       alert("Message sent! We'll get back to you soon.");
       document.getElementById("contactForm").reset();
-      await fillSummaryFromServerCart(); // re-fill after reset
+      await fillSummaryFromServerCart();
     } catch (err) {
-      console.error(err);
+      console.error('Send message failed:', err);
       alert("Couldn't send message. Please try again in a moment.");
     } finally {
       btn.disabled = false; btn.textContent = original;

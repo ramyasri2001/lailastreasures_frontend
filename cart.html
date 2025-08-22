@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Saved Designs – Laila's Treasures</title>
@@ -14,15 +14,18 @@
 <header>
   <div class="logo">Laila's Treasures</div>
   <nav>
-    <ul>
+    <ul id="navMenu">
       <li><a href="index.html">Home</a></li>
-      <li><span id="userNameDisplay" style="font-weight:bold; margin-left:10px; color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><a href="grillz.html">Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" id="logoutBtn">Logout</a></li>
+      <!-- user items injected by auth-header.js -->
     </ul>
   </nav>
 </header>
+
+<!-- Reusable auth header controller -->
+<script src="assets/js/auth-header.js"></script>
 
 <main>
   <h1>Your Saved Grillz</h1>
@@ -37,18 +40,6 @@
 <script>
   const API_BASE = "https://lailastreasures.onrender.com";
 
-  (function headerName(){
-    const n = localStorage.getItem("userName");
-    if (n) document.getElementById("userNameDisplay").textContent = `(${n})`;
-  })();
-
-  document.getElementById("logoutBtn").addEventListener("click", async (e) => {
-    e.preventDefault();
-    try { await fetch(`${API_BASE}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
-    localStorage.removeItem("userName");
-    location.href = "login.html";
-  });
-
   function normalizeImg(src) {
     if (!src) return "";
     if (src.startsWith("http") || src.startsWith("assets/")) return src;
@@ -61,9 +52,14 @@
     document.getElementById("totalPrice").textContent = "0.00";
 
     try {
+      // ensure logged in (cookie)
       const me = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' })
-                    .then(r=>r.json()).catch(()=>({loggedIn:false}));
-      if (!me.loggedIn) { container.innerHTML = "<p>Please log in to see your cart.</p>"; return; }
+                      .then(r => r.json())
+                      .catch(() => ({ loggedIn:false }));
+      if (!me.loggedIn) {
+        container.innerHTML = "<p>Please log in to see your cart.</p>";
+        return;
+      }
 
       const res = await fetch(`${API_BASE}/api/cart`, { credentials:'include' });
       if (!res.ok) throw new Error(`Failed to load cart (${res.status})`);
@@ -78,7 +74,7 @@
     const container = document.getElementById("saved-designs");
     container.innerHTML = "";
 
-    if (!items?.length) {
+    if (!items || !items.length) {
       container.innerHTML = "<p>No designs saved yet.</p>";
       document.getElementById("totalPrice").textContent = "0.00";
       return;
