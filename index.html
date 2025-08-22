@@ -1,43 +1,73 @@
-<html>
-<head>
-  <link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body>
 <header>
   <div class="logo">Laila's Treasures</div>
   <nav>
-    <ul>
-      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+    <ul id="navMenu">
+      <li><a href="grillz.html">Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
-      <li><a href="#" onclick="handleLogout()">Logout</a></li>
+      <!-- user items will be injected here -->
     </ul>
   </nav>
 </header>
+
 <script>
+  const API_BASE = "https://lailastreasures.onrender.com";
 
-  const userName = localStorage.getItem("userName");
-  const isLoggedIn = localStorage.getItem("userLoggedIn");
+  async function refreshHeader() {
+    const nav = document.getElementById("navMenu");
 
-  if (userName && isLoggedIn === "true") {
-    document.getElementById("userNameDisplay").textContent = `(${userName})`;
+    // remove previously injected user-specific items
+    nav.querySelectorAll(".user-nav").forEach(el => el.remove());
+
+    try {
+      const r = await fetch(`${API_BASE}/api/users/me`, { credentials: "include" });
+      const me = r.ok ? await r.json() : { loggedIn: false };
+
+      if (me.loggedIn) {
+        // show (Name) + Logout
+        const liName = document.createElement("li");
+        liName.className = "user-nav";
+        liName.innerHTML = `<span style="font-weight:bold;color:yellow;">(${me.name || "User"})</span>`;
+        nav.appendChild(liName);
+
+        const liLogout = document.createElement("li");
+        liLogout.className = "user-nav";
+        liLogout.innerHTML = `<a href="#" id="logoutBtn">Logout</a>`;
+        nav.appendChild(liLogout);
+
+        document.getElementById("logoutBtn").addEventListener("click", handleLogout);
+      } else {
+        // show Login + Create Account
+        const liLogin = document.createElement("li");
+        liLogin.className = "user-nav";
+        liLogin.innerHTML = `<a href="login.html">Login</a>`;
+        nav.appendChild(liLogin);
+
+        const liRegister = document.createElement("li");
+        liRegister.className = "user-nav";
+        liRegister.innerHTML = `<a href="register.html">Create Account</a>`;
+        nav.appendChild(liRegister);
+      }
+    } catch (err) {
+      console.error("Header refresh error:", err);
+      // fallback: show login links
+      const liLogin = document.createElement("li");
+      liLogin.className = "user-nav";
+      liLogin.innerHTML = `<a href="login.html">Login</a>`;
+      nav.appendChild(liLogin);
+
+      const liRegister = document.createElement("li");
+      liRegister.className = "user-nav";
+      liRegister.innerHTML = `<a href="register.html">Create Account</a>`;
+      nav.appendChild(liRegister);
+    }
   }
 
-  function handleLogout() {
-    localStorage.removeItem("userLoggedIn");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userEmail");
-    alert("You have been logged out.");
-    window.location.href = "login.html";
+  async function handleLogout(e) {
+    e.preventDefault();
+    try { await fetch(`${API_BASE}/api/users/logout`, { method: "POST", credentials: "include" }); } catch {}
+    location.href = "login.html";
   }
 
+  refreshHeader();
 </script>
-
-<main>
-  <section class="hero">
-    <h1>Custom Gold Grillz for Every Style</h1>
-    <p>Shop our handcrafted collection of premium grillz.</p>
-  </section>
-</main>
-</body>
-</html>
