@@ -5,9 +5,9 @@
   <title>Saved Designs – Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    .design-buttons { display: flex; gap: 0.6rem; }
-    .design-buttons button { padding: 0.4rem 0.8rem; font-weight: bold; border-radius: 4px; cursor: pointer; }
-    .saved-item { padding: 0.6rem 0; border-bottom: 1px solid #eee; }
+    .design-buttons { display:flex; gap:.6rem; }
+    .design-buttons button { padding:.4rem .8rem; font-weight:bold; border-radius:4px; cursor:pointer; }
+    .saved-item { padding:.6rem 0; border-bottom:1px solid #eee; }
   </style>
 </head>
 <body>
@@ -15,7 +15,7 @@
   <div class="logo">Laila's Treasures</div>
   <nav>
     <ul>
-      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><span id="userNameDisplay" style="font-weight:bold; margin-left:10px; color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
       <li><a href="#" id="logoutBtn">Logout</a></li>
@@ -27,7 +27,7 @@
   <h1>Your Saved Grillz</h1>
   <div id="saved-designs"></div>
   <h2>Total: $<span id="totalPrice">0.00</span></h2>
-  <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+  <div style="margin-top:2rem; display:flex; gap:1rem;">
     <button onclick="location.href='grillz.html'">Continue Shopping</button>
     <button onclick="location.href='contact.html'">Send Message</button>
   </div>
@@ -36,17 +36,16 @@
 <script>
   const API_BASE = "https://lailastreasures.onrender.com";
 
-  // show user name from localStorage (since /me doesn't return a name)
-  (function initHeaderUser() {
-    const name = localStorage.getItem("userName");
-    if (name) document.getElementById("userNameDisplay").textContent = `(${name})`;
+  (function headerName(){
+    const n = localStorage.getItem("userName");
+    if (n) document.getElementById("userNameDisplay").textContent = `(${n})`;
   })();
 
   document.getElementById("logoutBtn").addEventListener("click", async (e) => {
     e.preventDefault();
-    try { await fetch(`${API_BASE}/api/users/logout`, { method: 'POST', credentials: 'include' }); } catch {}
+    try { await fetch(`${API_BASE}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
     localStorage.removeItem("userName");
-    window.location.href = "login.html";
+    location.href = "login.html";
   });
 
   function normalizeImg(src) {
@@ -61,13 +60,11 @@
     document.getElementById("totalPrice").textContent = "0.00";
 
     try {
-      const me = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' }).then(r=>r.json()).catch(()=>({loggedIn:false}));
-      if (!me.loggedIn) {
-        container.innerHTML = "<p>Please log in to see your cart.</p>";
-        return;
-      }
+      const me = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' })
+                    .then(r=>r.json()).catch(()=>({loggedIn:false}));
+      if (!me.loggedIn) { container.innerHTML = "<p>Please log in to see your cart.</p>"; return; }
 
-      const res = await fetch(`${API_BASE}/api/cart`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE}/api/cart`, { credentials:'include' });
       if (!res.ok) throw new Error(`Failed to load cart (${res.status})`);
       const items = await res.json();
       renderCart(items);
@@ -80,7 +77,7 @@
     const container = document.getElementById("saved-designs");
     container.innerHTML = "";
 
-    if (!items || !items.length) {
+    if (!items?.length) {
       container.innerHTML = "<p>No designs saved yet.</p>";
       document.getElementById("totalPrice").textContent = "0.00";
       return;
@@ -94,16 +91,15 @@
 
       const topList = Array.isArray(item.selectedTop) ? item.selectedTop.join(", ") : "";
       const bottomList = Array.isArray(item.selectedBottom) ? item.selectedBottom.join(", ") : "";
-      const materialLabel = item.material || "Not specified";
 
       const div = document.createElement("div");
       div.className = "saved-item";
       div.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <img src="${normalizeImg(item.img)}" alt="${item.name || ''}" style="width: 60px; height: 40px; object-fit: cover; border-radius: 4px;">
-          <span style="flex: 1;">
+        <div style="display:flex; align-items:center; gap:1rem;">
+          <img src="${normalizeImg(item.img)}" alt="${item.name || ''}" style="width:60px; height:40px; object-fit:cover; border-radius:4px;">
+          <span style="flex:1;">
             <strong>${item.name || ''}</strong><br>
-            Material: ${materialLabel}<br>
+            Material: ${item.material || "Not specified"}<br>
             Top Teeth: ${item.top || 0} [${topList || "-"}]<br>
             Bottom Teeth: ${item.bottom || 0} [${bottomList || "-"}]<br>
             Price: $${price.toFixed(2)}
@@ -128,8 +124,8 @@
     if (!confirm("Remove this design?")) return;
     try {
       const res = await fetch(`${API_BASE}/api/cart/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+        method:'DELETE',
+        credentials:'include'
       });
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
       await loadCart();

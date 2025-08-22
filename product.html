@@ -4,13 +4,13 @@
   <title>Product - Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    .product-container { display: flex; gap: 3rem; margin-top: 2rem; align-items: flex-start; }
-    .product-image { flex: 1; max-width: 400px; }
-    .product-details { flex: 2; }
-    .price { font-size: 1.3rem; margin-top: 1rem; font-weight: bold; }
-    .discount { color: green; font-weight: bold; }
-    .tooth { width: 28px; height: 40px; background-color: white; border: 1px solid #aaa; border-radius: 6px; cursor: pointer; transition: 0.3s; }
-    .tooth.selected { background-color: gold; border-color: #d4af37; }
+    .product-container { display:flex; gap:3rem; margin-top:2rem; align-items:flex-start; }
+    .product-image { flex:1; max-width:400px; }
+    .product-details { flex:2; }
+    .price { font-size:1.3rem; margin-top:1rem; font-weight:bold; }
+    .discount { color:green; font-weight:bold; }
+    .tooth { width:28px; height:40px; background:#fff; border:1px solid #aaa; border-radius:6px; cursor:pointer; transition:.3s; }
+    .tooth.selected { background:gold; border-color:#d4af37; }
   </style>
 </head>
 <body>
@@ -18,7 +18,7 @@
   <div class="logo">Laila's Treasures</div>
   <nav>
     <ul>
-      <li><span id="userNameDisplay" style="font-weight: bold; margin-left: 10px; color: yellow;"></span><a href="grillz.html">  Grillz</a></li>
+      <li><span id="userNameDisplay" style="font-weight:bold; margin-left:10px; color:yellow;"></span><a href="grillz.html">  Grillz</a></li>
       <li><a href="cart.html">Saved Designs</a></li>
       <li><a href="contact.html">Contact</a></li>
       <li><a href="#" id="logoutBtn">Logout</a></li>
@@ -26,16 +26,16 @@
   </nav>
 </header>
 
-<main style="padding: 2rem;">
+<main style="padding:2rem;">
   <div class="product-container">
     <div class="product-image">
-      <img id="productImage" src="" alt="Grill" style="width: 100%; border-radius: 8px;">
+      <img id="productImage" src="" alt="Grill" style="width:100%; border-radius:8px;">
     </div>
     <div class="product-details">
       <h2 id="productName">Loading...</h2>
       <div><strong>Material:</strong> <span id="materialLabel">Loading...</span></div><br>
 
-      <div id="goldMaterialSelectContainer" style="display: none;">
+      <div id="goldMaterialSelectContainer" style="display:none;">
         <label id="goldMaterialLabel">Select Gold Type:</label><br>
         <select id="goldMaterialSelect"></select><br><br>
       </div>
@@ -53,11 +53,11 @@
     </div>
   </div>
 
-  <div style="margin-top: 2rem;">
+  <div style="margin-top:2rem;">
     <h3>Select Your Teeth:</h3>
-    <div id="teethDiagram" style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-      <div id="topRow" style="display: flex; gap: 0.3rem;"></div>
-      <div id="bottomRow" style="display: flex; gap: 0.3rem;"></div>
+    <div id="teethDiagram" style="display:flex; flex-direction:column; align-items:center; gap:1rem;">
+      <div id="topRow" style="display:flex; gap:0.3rem;"></div>
+      <div id="bottomRow" style="display:flex; gap:0.3rem;"></div>
     </div>
   </div>
 </main>
@@ -65,30 +65,28 @@
 <script>
   const BASE_API = "https://lailastreasures.onrender.com";
 
-  // Header name: use localStorage (since /me doesn’t return name)
-  (function initHeaderUser(){
-    const name = localStorage.getItem("userName");
-    if (name) document.getElementById("userNameDisplay").textContent = `(${name})`;
+  // Small header nicety
+  (function headerName(){
+    const n = localStorage.getItem("userName");
+    if (n) document.getElementById("userNameDisplay").textContent = `(${n})`;
   })();
 
-  // Logout (server cookie + UI)
   document.getElementById('logoutBtn').addEventListener('click', async (e) => {
     e.preventDefault();
     try { await fetch(`${BASE_API}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
     localStorage.removeItem('userName');
-    window.location.href = "login.html";
+    location.href = "login.html";
   });
 
-  // --- URL / state ---
-  const urlParams = new URLSearchParams(window.location.search);
-  const productName = urlParams.get("name") || "Grill";
-  const urlMaterial = urlParams.get("material"); // from category pages
+  // URL / state
+  const params = new URLSearchParams(location.search);
+  const productName = params.get("name") || "Grill";
+  const urlMaterial = params.get("material");
   let material = urlMaterial || "10K Gold";
 
-  let selectedTopTeeth = [1]; // preselect 1 to show price
+  let selectedTopTeeth = [1]; // preselect 1
   let selectedBottomTeeth = [];
 
-  // DOM
   const imgEl = document.getElementById("productImage");
   const nameEl = document.getElementById("productName");
   const materialLabelEl = document.getElementById("materialLabel");
@@ -102,7 +100,6 @@
 
   nameEl.textContent = productName;
 
-  // Build tooth grid
   function buildTeeth(rowId, prefix) {
     const row = document.getElementById(rowId);
     for (let i = 1; i <= 10; i++) {
@@ -119,37 +116,34 @@
   document.querySelector(".tooth[data-row='top'][data-index='1']").classList.add("selected");
 
   function toggleTooth(el) {
-    const row = el.dataset.row;
-    const index = parseInt(el.dataset.index);
-    const list = row === "top" ? selectedTopTeeth : selectedBottomTeeth;
-    const idx = list.indexOf(index);
-    if (idx > -1) { list.splice(idx, 1); el.classList.remove("selected"); }
-    else { list.push(index); el.classList.add("selected"); }
+    const list = el.dataset.row === "top" ? selectedTopTeeth : selectedBottomTeeth;
+    const idx = list.indexOf(+el.dataset.index);
+    if (idx > -1) { list.splice(idx,1); el.classList.remove("selected"); }
+    else { list.push(+el.dataset.index); el.classList.add("selected"); }
     updatePrice();
   }
 
-  // ----- Data helpers -----
   async function fetchProductBy(name, mat) {
-    const qs = new URLSearchParams({ name, material: mat });
-    const res = await fetch(`${BASE_API}/api/products?${qs.toString()}`, { credentials: "omit" });
-    if (!res.ok) return null;
-    const items = await res.json();
-    return items && items[0] ? items[0] : null;
+    try {
+      const qs = new URLSearchParams({ name, material: mat });
+      const res = await fetch(`${BASE_API}/api/products?${qs}`, { credentials:'omit' });
+      if (!res.ok) return null;
+      const items = await res.json();
+      return items?.[0] || null;
+    } catch { return null; }
   }
 
   async function loadInitialProduct() {
-    // Configure dropdown depending on material
-    const matLower = material.toLowerCase();
+    const ml = material.toLowerCase();
 
-    if (matLower.includes("silver")) {
+    if (ml.includes("silver")) {
       goldWrap.style.display = "none";
-    } else if (matLower.includes("rose")) {
+    } else if (ml.includes("rose")) {
       goldWrap.style.display = "block";
       goldLabel.textContent = "Select Rose Gold Type:";
       goldSelect.innerHTML = `
         <option value="Rose Gold">Rose Gold</option>
-        <option value="Plated Rose Gold">Plated Rose Gold</option>
-      `;
+        <option value="Plated Rose Gold">Plated Rose Gold</option>`;
       goldSelect.value = material;
       goldSelect.onchange = handleMaterialChange;
     } else {
@@ -160,13 +154,12 @@
         <option value="10K Gold">10K Gold</option>
         <option value="14K Gold">14K Gold</option>
         <option value="Gold Plated">Gold Plated</option>
-        <option value="Florida Gold">Florida Gold</option>
-      `;
+        <option value="Florida Gold">Florida Gold</option>`;
       goldSelect.value = material;
       goldSelect.onchange = handleMaterialChange;
     }
 
-    await updatePrice(); // also sets image
+    await updatePrice();
   }
 
   function handleMaterialChange(e) {
@@ -177,23 +170,15 @@
 
   async function updatePrice() {
     materialLabelEl.textContent = material;
-
-    // Load product record for chosen material
     const rec = await fetchProductBy(productName, material);
 
-    // Update image
-    if (rec && rec.img) {
-      imgEl.src = `assets/images/${rec.img}`;
-    } else {
-      imgEl.src = "assets/images/gold1.jpg";
-    }
+    imgEl.src = rec?.img ? `assets/images/${rec.img}` : "assets/images/gold1.jpg";
 
-    // Totals
     const top = selectedTopTeeth.length;
     const bottom = selectedBottomTeeth.length;
     const total = top + bottom;
 
-    const pricePerTooth = rec && rec.price ? Number(rec.price) : 0;
+    const pricePerTooth = rec?.price ? Number(rec.price) : 0;
     let totalPrice = total * pricePerTooth;
     let discount = "";
     if (total >= 6) { totalPrice *= 0.8; discount = "Since you selected 6 or more teeth, you get 20% discount!"; }
@@ -206,10 +191,11 @@
 
   async function addToCart() {
     // must be logged in (cookie)
-    const me = await fetch(`${BASE_API}/api/users/me`, { credentials: 'include' }).then(r=>r.json()).catch(()=>({loggedIn:false}));
+    const me = await fetch(`${BASE_API}/api/users/me`, { credentials:'include' })
+                  .then(r=>r.json()).catch(()=>({loggedIn:false}));
     if (!me.loggedIn) {
       alert("Please log in to save your design.");
-      window.location.href = "login.html";
+      location.href = "login.html";
       return;
     }
 
@@ -221,16 +207,7 @@
     }
 
     const rec = await fetchProductBy(productName, material);
-    if (!rec) {
-      alert("Unable to save design: product or price not found.");
-      return;
-    }
-
-    const price = parseFloat(priceEl.textContent);
-    if (!Number.isFinite(price)) {
-      alert("Please choose material and teeth so we can calculate the price.");
-      return;
-    }
+    if (!rec) { alert("Unable to save design: product/price not found."); return; }
 
     const item = {
       name: productName,
@@ -240,27 +217,20 @@
       bottom,
       selectedTop: selectedTopTeeth,
       selectedBottom: selectedBottomTeeth,
-      price
+      price: Number(document.getElementById('priceValue').textContent) || 0
     };
 
     try {
       const res = await fetch(`${BASE_API}/api/cart`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type':'application/json' },
         credentials: 'include',
         body: JSON.stringify(item)
       });
-      if (res.status === 401) {
-        alert("Please log in to save your design.");
-        window.location.href = "login.html";
-        return;
-      }
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`Save failed: ${res.status} ${t}`);
-      }
+      if (res.status === 401) { alert("Please log in."); location.href="login.html"; return; }
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
       alert("Design saved!");
-      window.location.href = "cart.html";
+      location.href = "cart.html";
     } catch (err) {
       alert(err.message);
     }
