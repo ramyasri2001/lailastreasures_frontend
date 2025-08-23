@@ -120,7 +120,7 @@
   async function fetchProductBy(name, mat) {
     try {
       const qs = new URLSearchParams({ name, material: mat });
-      const res = await fetch(`${BASE_API}/api/products?${qs}`, { credentials:'omit' });
+      const res = await fetch(`${API_BASE}/api/products?${qs}`, { credentials:'omit' });
       if (!res.ok) return null;
       const items = await res.json();
       return items?.[0] || null;
@@ -194,7 +194,7 @@
 
   async function addToCart() {
     // require login (cookie)
-    const me = await fetch(`${BASE_API}/api/users/me`, { credentials:'include' })
+    const me = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' })
                       .then(r=>r.json()).catch(()=>({loggedIn:false}));
     if (!me.loggedIn) {
       alert("Please log in to save your design.");
@@ -226,7 +226,7 @@
     };
 
     try {
-      const res = await fetch(`${BASE_API}/api/cart`, {
+      const res = await fetch(`${API_BASE}/api/cart`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
         credentials: 'include',
