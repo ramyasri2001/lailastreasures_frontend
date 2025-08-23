@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8" />
   <title>Admin Dashboard - Laila's Treasures</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    body { padding: 2rem; font-family: Arial; }
+    body { padding: 2rem; font-family: Arial, sans-serif; }
     .section { margin-bottom: 3rem; }
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
@@ -12,7 +13,6 @@
     button { padding: 0.5rem 1rem; margin-top: 0.5rem; background: gold; border: none; font-weight: bold; cursor: pointer; }
     img.product-preview { width: 60px; height: auto; border-radius: 4px; }
     .error { color: #b00020; margin-top: .5rem; }
-
     /* Drag & drop ordering */
     .order-item {
       display:flex; align-items:center; gap:.75rem;
@@ -98,19 +98,21 @@
     const PRODUCTS_API = `${API_BASE}/api/products`;
     const ORDER_API    = `${API_BASE}/api/order`;
 
-    // ---- Admin gate (requires login cookie and, if available, isAdmin flag)
+    // ---- Admin gate (requires login cookie AND isAdmin)
     (async function guard(){
       try {
         const r = await fetch(`${API_BASE}/api/users/me`, { credentials:'include' });
         const me = r.ok ? await r.json() : { loggedIn:false };
-        if (!me.loggedIn || (typeof me.isAdmin !== 'undefined' && !me.isAdmin)) {
-          alert('Admins only'); location.href = 'login.html'; return;
+        if (!me.loggedIn || !me.isAdmin) {
+          // Don’t reveal the existence of admin: just bounce to login
+          location.href = 'login.html';
+          return;
         }
         // load only after we know we’re allowed
         buildOrderList();
         loadProducts();
       } catch {
-        alert('Please log in as admin'); location.href = 'login.html';
+        location.href = 'login.html';
       }
     })();
 
@@ -128,19 +130,17 @@
         if (!res.ok) throw new Error(`List failed: ${res.status}`);
         const items = await res.json();
 
-        if (!items.length) {
-          list.innerHTML = "<p>No products added yet.</p>";
-          return;
-        }
+        if (!items.length) { list.innerHTML = "<p>No products added yet.</p>"; return; }
 
         let html = `<table><thead>
           <tr><th>Name</th><th>Image</th><th>Material</th><th>Price</th><th>Category</th><th>Actions</th></tr>
         </thead><tbody>`;
 
         items.forEach(p => {
+          const imgSrc = (p.img?.startsWith('http') || p.img?.startsWith('assets/')) ? p.img : `assets/images/${p.img||''}`;
           html += `<tr>
-            <td>${p.name}</td>
-            <td><img src="assets/images/${p.img}" class="product-preview" alt="${p.name}"></td>
+            <td>${p.name || ''}</td>
+            <td><img src="${imgSrc}" class="product-preview" alt="${p.name||''}"></td>
             <td>${p.material || ''}</td>
             <td>$${Number(p.price || 0).toFixed(2)}</td>
             <td>${(p.category || '').replace('.html','')}</td>
@@ -175,7 +175,7 @@
       $('#formError').textContent = '';
     });
 
-    // Save (upsert)
+    // Save (upsert) — ADMIN ONLY (credentials included)
     document.getElementById('productForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       $('#formError').textContent = '';
@@ -192,11 +192,11 @@
         const res = await fetch(PRODUCTS_API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',                 // send auth cookie
+          credentials: 'include',                 // send auth cookie (admin check server-side)
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
-          const t = await res.text();
+          const t = await res.text().catch(()=> '');
           throw new Error(`Save failed: ${res.status} ${t}`);
         }
         alert('Saved!');
@@ -206,24 +206,24 @@
       } catch (err) {
         console.error(err);
         $('#formError').textContent = err.message;
-        alert('Failed to save. Check login & CORS.');
+        alert('Failed to save. Check you are logged in as admin.');
       }
     });
 
-    // Delete
+    // Delete — ADMIN ONLY
     async function deleteProduct(id) {
       if (!id) return alert('Missing id for delete.');
       if (!confirm('Delete this product?')) return;
       try {
         const res = await fetch(`${PRODUCTS_API}/${id}`, {
           method: 'DELETE',
-          credentials: 'include'                  // send auth cookie
+          credentials: 'include'
         });
         if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
         loadProducts();
       } catch (err) {
         console.error(err);
-        alert('Failed to delete. Check login & CORS.');
+        alert('Failed to delete. Check you are logged in as admin.');
       }
     }
     window.deleteProduct = deleteProduct;
@@ -280,20 +280,21 @@
           const ib = savedOrder.indexOf(b.designKey);
           const A = ia === -1 ? 999999 : ia;
           const B = ib === -1 ? 999999 : ib;
-          return A - B || a.name.localeCompare(b.name);
+          return A - B || (a.name||'').localeCompare(b.name||'');
         });
 
         orderListEl.innerHTML = '';
         designs.forEach(d => {
+          const imgSrc = (d.img?.startsWith('http') || d.img?.startsWith('assets/')) ? d.img : `assets/images/${d.img||''}`;
           const li = document.createElement('li');
           li.className = 'order-item';
           li.draggable = true;
           li.dataset.designKey = d.designKey;
           li.innerHTML = `
             <div class="order-handle" title="Drag"></div>
-            <img src="assets/images/${d.img}" alt="" style="width:48px;height:32px;object-fit:cover;border-radius:4px;">
-            <div style="font-weight:600">${d.name}</div>
-            <div style="color:#888;margin-left:auto">${d.material}</div>
+            <img src="${imgSrc}" alt="" style="width:48px;height:32px;object-fit:cover;border-radius:4px;">
+            <div style="font-weight:600">${d.name||''}</div>
+            <div style="color:#888;margin-left:auto">${d.material||''}</div>
           `;
           addDragEvents(li);
           orderListEl.appendChild(li);
