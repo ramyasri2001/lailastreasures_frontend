@@ -337,7 +337,9 @@
     return r.json();
   }
   async function fetchOrder(category){
-    const r = await fetch(`${ORDER_API}?category=${encodeURIComponent(category)}`, { credentials:'include' });
+    const r = await fetch(`${ORDER_API}?category=${encodeURIComponent(category)}`, { 
+      credentials:'include' ,
+    });
     if(!r.ok) return { category, order: [] };
     return r.json();
   }
