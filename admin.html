@@ -24,6 +24,17 @@
   </style>
 </head>
 <body>
+  <!-- Admin top bar -->
+<div id="adminBar" style="display:flex;gap:.75rem;align-items:center;justify-content:space-between;background:#111;color:#fff;padding:.5rem .8rem;border-radius:8px; margin-bottom:1rem;">
+  <div>
+    <strong>Admin</strong>
+    <span id="adminName" style="opacity:.85;margin-left:.5rem;"></span>
+  </div>
+  <div style="display:flex;gap:.5rem;align-items:center;">
+    <a href="index.html" style="color:#ffd64d;text-decoration:none;">← Back to site</a>
+    <button id="adminLogoutBtn" style="background:#e11d48;color:#fff;border:none;padding:.4rem .7rem;border-radius:6px;cursor:pointer;">Logout</button>
+  </div>
+</div>
   <h1>Admin Panel</h1>
 
   <div class="grid">
@@ -42,7 +53,7 @@
           <input id="secName" placeholder="Gold Grillz" required>
         </div>
         <div style="flex:1 1 220px">
-          <label>Cover Image (filename or URL)</label><br>
+          <label>Cover Image </label><br>
           <input id="secImage" placeholder="grillz1.jpg">
         </div>
         <div style="flex:0 0 120px">
@@ -406,6 +417,38 @@
       return closest;
     }, { offset: -Infinity }).element;
   }
+
+  // Fill name and wire logout
+  async function setupAdminBar() {
+    try {
+      const r = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' });
+      if (!r.ok) throw new Error('unauth');
+      const me = await r.json();
+
+      // if not admin, kick out
+      if (!me.loggedIn || !me.isAdmin) {
+        alert('Admins only');
+        location.href = 'login.html';
+        return;
+      }
+
+      // show name
+      document.getElementById('adminName').textContent = `(${me.name || 'Admin'})`;
+    } catch {
+      location.href = 'login.html';
+      return;
+    }
+
+    document.getElementById('adminLogoutBtn').addEventListener('click', async () => {
+      try { await fetch(`${API_BASE}/api/users/logout`, { method:'POST', credentials:'include' }); } catch {}
+      // optional: clear any display-only local storage name
+      try { localStorage.removeItem('userName'); } catch {}
+      location.href = 'login.html';
+    });
+  }
+
+  // run immediately
+  setupAdminBar();
 </script>
 </body>
 </html>
